@@ -1,0 +1,49 @@
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+*.tmp
+*.log
+.claude/
+.impeccable/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# scratch scripts
+scratch/*
+!scratch/.gitkeep
+
+# session data — keep folder names, not profiles / cookies / store
+/data/*
+!/data/.gitkeep
+!/data/*.example.json
+!/data/profiles/
+/data/profiles/*
+!/data/profiles/.gitkeep
+!/data/cookies/
+/data/cookies/*
+!/data/cookies/.gitkeep
+!/data/backups/
+/data/backups/*
+!/data/backups/.gitkeep
+!/data/extensions/
+/data/extensions/*
+!/data/extensions/.gitkeep
+/data/webview_profile/*
+
+# generated logs & diagnostic sheets
+/updates/*
+!/updates/.gitkeep
+
+# dumps — keep folder names & example templates, not sensitive proxy / fingerprint / account data
+/resources/AccountFile.csv
+!/resources/AccountFile.example.csv
+/resources/proxies/*
+!/resources/proxies/.gitkeep
+!/resources/proxies/*.example.txt
+/resources/fpts/*
+!/resources/fpts/.gitkeep
+!/resources/extensions/
+/resources/extensions/*
+!/resources/extensions/.gitkeep
