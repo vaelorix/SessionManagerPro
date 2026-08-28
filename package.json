@@ -1,0 +1,33 @@
+{
+  "name": "session-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Per-session profiles with sticky proxy + invisible_playwright stealth engine",
+  "main": "backend/src/manager.js",
+  "bin": {
+    "session-manager": "backend/src/index.js"
+  },
+  "scripts": {
+    "start": "node backend/src/server.js",
+    "gui": "node backend/src/server.js",
+    "app": "SessionManagerPro.exe",
+    "cli": "node backend/src/index.js",
+    "build:ui": "npm --prefix frontend run build",
+    "build:exe": "powershell -ExecutionPolicy Bypass -File scripts/build-exe.ps1",
+    "build": "npm run build:ui && npm run build:exe",
+    "engine:fetch": ".venv\\Scripts\\python.exe -m invisible_playwright fetch",
+    "selfcheck": "node backend/src/index.js selfcheck"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.10.1",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.5",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "ora": "^5.4.1",
+    "ws": "^8.18.0"
+  }
+}
