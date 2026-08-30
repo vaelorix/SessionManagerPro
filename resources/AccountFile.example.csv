@@ -1,0 +1,3 @@
+AccountId,No.,Email,First,Last,Birthday,Password,Alias,Fingerprint,MobileFingerprint,RecoveryEmail,RecoveryPassword,Country,TotalPoints,PointsToday,PointsLast,AccountStatus,RunStatus,Proxy,Status,Mode,TimeRun
+acc_example01,1,sample_account1@outlook.com,John,Doe,01/01/2000,Password@123,,,sample_fingerprint.json,recovery1@example.com,,United States,0,,,,,http://username:password@127.0.0.1:8080,ready,Default,
+acc_example02,2,sample_account2@outlook.com,Jane,Smith,01/01/2000,Password@123,,,sample_fingerprint.json,recovery2@example.com,,United States,0,,,,,http://username:password@127.0.0.1:8080,ready,Default,
