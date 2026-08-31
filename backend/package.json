@@ -1,0 +1,21 @@
+{
+  "name": "session-manager-backend",
+  "version": "1.1.0",
+  "private": true,
+  "description": "SessionManagerPro backend server and session orchestration engine",
+  "main": "src/manager.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "cli": "node src/index.js",
+    "selfcheck": "node src/index.js selfcheck"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.10.1",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.5",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "ora": "^5.4.1",
+    "ws": "^8.18.0"
+  }
+}
