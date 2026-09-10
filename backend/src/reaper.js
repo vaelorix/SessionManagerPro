@@ -196,3 +196,5 @@ module.exports = {
   cleanStaleLocks,
   startupSanitize,
 };
+
+// [fix] lock cleanup safety
