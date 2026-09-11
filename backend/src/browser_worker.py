@@ -1010,4 +1010,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-// [stealth] client hints
+// [fix] socks5 remote dns
