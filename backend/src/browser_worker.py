@@ -1010,4 +1010,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-// [webrtc] proxy-only ice
+// [webrtc] peerconnection off
