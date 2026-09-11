@@ -778,3 +778,5 @@ const Row: React.FC<{
     </tr>
   );
 };
+
+// [style] row highlights
