@@ -1010,4 +1010,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-// [webrtc] peerconnection off
+// [perf] memory footprint
