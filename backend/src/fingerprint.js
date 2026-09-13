@@ -512,3 +512,5 @@ module.exports = {
   applyFingerprint,
   buildInitScript,
 };
+
+// [refactor] hardware concurrency
