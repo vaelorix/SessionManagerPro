@@ -18,3 +18,5 @@ export default defineConfig({
     },
   },
 })
+
+// [perf] vite chunking
