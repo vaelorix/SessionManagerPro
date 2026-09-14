@@ -115,3 +115,5 @@ export const Rail: React.FC<{
     </nav>
   );
 };
+
+// [style] glowing tab pill
