@@ -652,3 +652,5 @@ module.exports = {
   ACCOUNT_FILE,
   STORE_PATH,
 };
+
+// [fix] stale lock check
