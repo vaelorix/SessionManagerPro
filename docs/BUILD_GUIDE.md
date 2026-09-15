@@ -59,3 +59,5 @@ npm run build:exe
 ### Issue: `WebView2 Loader Missing`
 **Cause**: The WebView2 Evergreen Runtime is not installed on older Windows builds.  
 **Fix**: Download and install the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/).
+
+<!-- docs: build troubleshooting -->
