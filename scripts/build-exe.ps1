@@ -24,3 +24,5 @@ if (Test-Path $outputExe) {
     Write-Error "Compilation failed."
     exit 1
 }
+
+# [scripts] error detection
