@@ -284,3 +284,5 @@ export const FingerprintPanel: React.FC<Props> = ({
     </>
   );
 };
+
+// [fpts] spec tooltips
