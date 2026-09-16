@@ -364,3 +364,5 @@ module.exports = {
   deriveSeed,
   launchWorker,
 };
+
+// [worker] path resolution
