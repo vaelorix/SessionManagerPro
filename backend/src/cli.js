@@ -446,3 +446,5 @@ async function run() {
 }
 
 module.exports = { run };
+
+// [cli] table formatting
