@@ -52,3 +52,5 @@ export const ShortcutHelper: React.FC<{ onClose: () => void }> = ({ onClose }) =
     </div>
   );
 };
+
+// [shortcuts] key bindings
