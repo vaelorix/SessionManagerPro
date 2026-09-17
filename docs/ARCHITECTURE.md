@@ -1,33 +1,38 @@
-# 🏛️ Architecture & Internal Engine Mechanics
+# 🏛️ System Architecture & Internal Engine Mechanics
 
-Technical deep-dive into the SessionManagerPro orchestration engine and stealth subsystem.
+Technical specifications of the multi-tier SessionManagerPro orchestration engine, IPC pipeline, and stealth worker subsystem.
 
 ---
 
-## 📐 High-Level Architecture Diagram
+## 📐 Component Architecture Diagram
 
 ```mermaid
 graph TD
-    User([User / Operator]) -->|Interacts with| GUI[Native Desktop Wrapper<br/>SessionManagerPro.exe (WPF/WebView2)]
-    GUI -->|HTTP/REST & WebSockets| SVR[Backend Server<br/>Node.js Express / WS :3000]
+    User([Operator / Desktop User]) -->|Interacts with UI| WPF[Native Desktop Host<br/>SessionManagerPro.exe (C# WPF / WebView2)]
     
+    subgraph Frontend Presentation Layer
+        WPF -->|Embedded Web View| React[React 19 Cyber Dashboard<br/>TypeScript + Vite]
+        React -->|REST API & WS Client| SVR
+    end
+
     subgraph Node.js Backend Orchestrator
+        SVR[Express HTTP & WebSocket Server<br/>Port :3000]
         SVR --> MGR[Session Manager<br/>manager.js]
-        MGR --> ORCH[Orchestrator<br/>orchestrator.js]
-        MGR --> REAP[Zombie Reaper<br/>reaper.js]
+        MGR --> ORCH[Queue Orchestrator<br/>orchestrator.js]
+        MGR --> REAP[Zero-Zombie Reaper<br/>reaper.js]
         MGR --> FP[Fingerprint Hub<br/>fingerprint.js]
         MGR --> EXT[Extension Registry<br/>extension_manager.js]
     end
 
     subgraph Python Stealth Subsystem
-        ORCH -->|Spawns via IPC Stdin/Stdout| WRK[Browser Worker<br/>browser_worker.py]
-        WRK --> INVPW[InvisiblePlaywright Engine]
-        WRK --> PIN[Toolbar Pinning Injector<br/>browser.uiCustomization.state]
-        WRK --> MARIO[Marionette Port Injector]
-        INVPW --> FF[Firefox Stealth Instance<br/>Hardware-Mapped GPU/Canvas/WebGL]
+        ORCH -->|Spawns Child Process via JSON-Lines Stdio| WRK[Stealth Worker<br/>browser_worker.py]
+        WRK --> INVPW[InvisiblePlaywright Stealth Engine]
+        WRK --> PIN[Toolbar Customizer<br/>browser.uiCustomization.state]
+        WRK --> MARIO[Marionette Automation Port]
+        INVPW --> FF[Firefox Stealth Instance<br/>Hardware-Mapped Canvas / WebGL / Audio]
     end
 
-    subgraph Storage Layer
+    subgraph Persistent Storage Layer
         MGR --> DATA_SESS[(data/sessions.json)]
         MGR --> DATA_PROF[(data/profiles/*)]
         MGR --> DATA_COOK[(data/cookies/*)]
@@ -36,34 +41,47 @@ graph TD
 
 ---
 
-## 🔧 Subsystem Breakdown
+## 🔧 Subsystem Specifications
 
 ### 1. Native Desktop Shell (`launcher/SessionManagerPro.cs`)
-- Lightweight C# WPF application targeting .NET Framework 4.8.
-- Embeds Microsoft Edge WebView2 Evergreen Runtime.
-- Automates lifecycle: on launch, ensures backend Node.js server is active; on close, cleans up processes.
+- **Runtime**: Windows Presentation Foundation (WPF) targeting .NET Framework 4.8.
+- **Embedded Engine**: Microsoft Edge WebView2 Evergreen.
+- **Process Lifecycle Management**: On launch, probes `http://127.0.0.1:3000/health`. If the server is offline, it automatically spawns the background Node.js process. On window closure, it signals graceful shutdown to active child workers.
+
+---
 
 ### 2. Backend Orchestration Layer (`backend/src/`)
-- **`server.js`**: Express server exposing REST API endpoints (`/api/sessions`, `/api/pool`, `/api/resources`, `/api/extensions`) and a bidirectional WebSocket (`ws://127.0.0.1:3000/ws`) for real-time telemetry (active duration, open tabs, live cookie count).
-- **`orchestrator.js`**: Concurrency queue manager that respects the operator's thread stepper limit, scheduling launches without spiking host CPU.
-- **`reaper.js`**: Scans the operating system process table for orphaned geckodriver or Firefox worker processes, releasing stale locks (`parent.lock`, `MarionetteActivePort`).
+- **REST Endpoints**:
+  - `GET /api/sessions`: Returns session configurations, active runtimes, and health statuses.
+  - `POST /api/sessions/launch`: Dispatches session launch command to the queue orchestrator.
+  - `POST /api/sessions/stop`: Requests graceful session termination and cookie persistence.
+  - `GET /api/pool`: Provides live statistics on proxy availability and fingerprint pools.
+- **WebSocket Streaming (`/ws`)**:
+  - Pushes sub-second telemetry updates (runtime duration, open tab count, proxy ping latency, cookie sync events) to the React dashboard.
+- **Dynamic Concurrency Control (`orchestrator.js`)**:
+  - Employs an asynchronous queue stepper to enforce thread concurrency limits (e.g. max 5 concurrent browsers), preventing CPU spikes and memory exhaustion.
+- **Zero-Zombie Reaper (`reaper.js`)**:
+  - Periodically scans the Windows process table using `psutil` heuristics.
+  - Automatically detects and terminates orphaned `geckodriver.exe` or `firefox.exe` processes whose parent Node.js worker has died, releasing locked ports and `.parent.lock` profile directories.
 
-### 3. Stealth Worker (`backend/src/browser_worker.py`)
-- Executes in an isolated Python 3 subprocess communicating with the parent Node.js orchestrator via JSON lines over standard I/O pipes.
-- Injects exact hardware properties into all browser frames:
-  - `navigator.hardwareConcurrency` & `navigator.deviceMemory`
-  - WebGL `UNMASKED_VENDOR_WEBGL` & `UNMASKED_RENDERER_WEBGL`
-  - High-entropy Client Hints (`getHighEntropyValues`)
-  - Screen dimensions, viewport, and Device Pixel Ratio (`devicePixelRatio`).
-- Dynamically configures Firefox preferences:
-  - Strict proxy routing (DNS remote resolution, socks5 authentication).
-  - WebRTC candidate filtering (`media.peerconnection.ice.proxy_only`).
-  - Pre-boots extension placement directly in `placements['nav-bar']` to guarantee frame-1 toolbar pinning.
+---
+
+### 3. Stealth Worker Subsystem (`backend/src/browser_worker.py`)
+- **IPC Protocol**: Communicates with the Node.js orchestrator via newline-delimited JSON messages over standard input (`stdin`) and standard output (`stdout`).
+- **Fingerprint Emulation**:
+  - Injects authentic GPU renderer and vendor strings (`UNMASKED_RENDERER_WEBGL`).
+  - Emulates physical hardware concurrency (`navigator.hardwareConcurrency`) and device memory (`navigator.deviceMemory`).
+  - Spoofs genuine audio context frequencies and client hints without detectable synthetic entropy.
+- **Preference Optimization**:
+  - Dynamic proxy configuration with remote DNS lookups (`network.proxy.socks_remote_dns = true`).
+  - WebRTC proxy candidate enforcement (`media.peerconnection.ice.proxy_only = true`).
+  - Automated extension toolbar placement via `browser.uiCustomization.state`.
 
 ---
 
 ## 🚀 Next Steps
 
 - Return to the [**Main README ↗**](../README.md)
-- Check out the [**Installation Guide ↗**](INSTALLATION.md) for environment requirements.
+- Check out the [**Installation Guide ↗**](INSTALLATION.md) for environment setup.
+- Check out the [**Build Guide ↗**](BUILD_GUIDE.md) to compile the native desktop launcher.
 - Check out the [**Configuration Guide ↗**](CONFIGURATION.md) to fine-tune proxies and authentic fingerprints.

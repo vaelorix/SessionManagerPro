@@ -1,78 +1,138 @@
+<p align="center">
+  <img src="docs/assets/monkey.gif" width="200" alt="SessionManagerPro Mascot" />
+</p>
+
 <div align="center">
 
-<!-- Centered Animated Laughing Monkey Mascot (Rendered from local asset for 100% reliability on GitHub) -->
-<img src="docs/assets/monkey.gif" width="220" alt="Laughing Monkey Mascot" style="border-radius: 18px; box-shadow: 0 12px 36px rgba(0,0,0,0.5);" />
-
 # 🐵 SessionManagerPro (SMP)
-### *The Ultimate Multi-Threaded Anti-Detect Stealth Browser Orchestrator* 🎭✨
 
-<p align="center">
-  <b>Bypass anti-fraud algorithms, run multi-threaded stealth profiles, pin extensions, and isolate proxy tunnels with zero synthetic noise.</b>
-</p>
+### *Enterprise Anti-Detect Stealth Browser Orchestrator* 🎭✨
 
-<!-- Shields / Badges -->
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
-  <img src="https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js" />
-  <img src="https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
-  <img src="https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/C%23-WPF%20%2F%20WebView2-239120?style=for-the-badge&logo=csharp&logoColor=white" alt="C#" />
-  <img src="https://img.shields.io/badge/Engine-InvisiblePlaywright-FF4081?style=for-the-badge&logo=firefox&logoColor=white" alt="Engine" />
-  <img src="https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows" />
-  <img src="https://img.shields.io/badge/License-MIT-amber?style=for-the-badge" alt="License" />
-</p>
+**Bypass modern anti-fraud algorithms, orchestrate multi-threaded stealth profiles, automatically pin toolbar extensions, and isolate proxy tunnels with authentic hardware signatures.**
 
----
+[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![C#](https://img.shields.io/badge/C%23-WPF%20%2F%20WebView2-239120?style=for-the-badge&logo=csharp&logoColor=white)](https://learn.microsoft.com/dotnet/csharp/)
+[![Engine](https://img.shields.io/badge/Engine-InvisiblePlaywright-FF4081?style=for-the-badge&logo=firefox&logoColor=white)](https://github.com/)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+[![License](https://img.shields.io/badge/License-MIT-amber?style=for-the-badge)](LICENSE)
 
 </div>
 
-## 🧰 Powered By Modern Tech & Languages
+---
 
-| Icon | Language / Tool | Purpose in SessionManagerPro |
-| :---: | :--- | :--- |
-| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg" width="24" height="24" /> | **Python 3.11** | Subprocess browser worker, `invisible_playwright` engine, WebGL/Canvas spoofing & Marionette IPC |
-| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/nodejs/nodejs-original.svg" width="24" height="24" /> | **Node.js & Express** | High-throughput backend REST API server, concurrency queue manager & real-time WebSocket hub |
-| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" width="24" height="24" /> | **React 19** | Cyber-dark glassmorphism dashboard, reactive state management & modular component architecture |
-| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/typescript/typescript-original.svg" width="24" height="24" /> | **TypeScript** | Strict compile-time type safety across all frontend API contracts and UI states |
-| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/csharp/csharp-original.svg" width="24" height="24" /> | **C# / .NET 4.8** | Native Windows desktop wrapper executable hosting Microsoft Edge WebView2 Evergreen |
-| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/firefox/firefox-original.svg" width="24" height="24" /> | **Mozilla Firefox** | Stealth browsing runtime isolated with sticky SOCKS5/HTTP proxies and authentic hardware fingerprints |
-| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/vitejs/vitejs-original.svg" width="24" height="24" /> | **Vite** | Sub-second frontend HMR and ultra-compact production bundling |
+## 📑 Table of Contents
+
+- [Overview & Architecture](#-overview--architecture)
+- [Tech Stack & Ecosystem](#-tech-stack--ecosystem)
+- [Enterprise Features](#-enterprise-features)
+- [Project Directory Layout](#-project-directory-layout)
+- [Quickstart Guide](#-quickstart-guide)
+  - [Prerequisites](#1-prerequisites)
+  - [Environment Setup](#2-environment-setup)
+  - [Running the Application](#3-running-the-application)
+  - [Production Builds](#4-compilation--production-builds)
+- [Deep Dive Documentation](#-deep-dive-documentation)
+- [Command Reference](#-command-reference)
+- [Special Thanks & Credits](#-special-thanks--credits)
+- [License](#-license)
 
 ---
 
-## 🌟 Highlights & Killer Features 🎯
+## 💎 Overview & Architecture
 
-- 🎭 **100% Authentic Hardware Fingerprints**: No synthetic randomization. Viewports, GPU renderers, audio noise, and hardware concurrency are strictly mapped from genuine physical machines.
-- 📌 **Automatic Extension Toolbar Pinning**: Unpack `.xpi`, `.crx`, or `.zip` extensions and watch them appear pinned directly to Firefox’s navigation bar on frame 1 via `browser.uiCustomization.state`.
-- 🛡️ **WebRTC Leak Armor**: Route WebRTC ICE candidates strictly through your proxy tunnel or completely disable `media.peerconnection` for zero-leak guarantees.
-- ⚡ **Multi-Threaded Concurrency Stepper**: Control concurrent session load with a live stepper bar (from 1 to 20+ profiles simultaneously) without freezing host CPU.
-- 👻 **Ephemeral & Cloaked Headless Modes**: Run completely disposable sessions that wipe cookies on exit, or cloak sessions in the background without rendering GUI windows.
-- 🧹 **Zero-Zombie Reaper Subsystem**: Auto-cleans orphan `geckodriver` processes, leftover `.parent.lock` files, and stale port bindings automatically.
+Modern anti-fraud algorithms (such as Cloudflare Turnstile, Datadome, Akamai, and Kasada) detect automated browser instances by inspecting **entropy inconsistencies** — random WebGL parameters, synthetic audio noise, spoofed canvas signatures, and mismatched client hints.
+
+**SessionManagerPro** solves this at the architectural level:
+- **Deterministic Hardware Mapping**: Replaces synthetic randomness with captured hardware profiles from authentic physical machines.
+- **Hybrid Micro-Orchestrator**: Blends a ultra-lightweight **C# WPF + WebView2** native wrapper with a **Node.js Express / WebSocket** backend and an **isolated Python stealth worker** (`invisible_playwright`).
+- **Frame-1 Toolbar Pinning**: Dynamically modifies `browser.uiCustomization.state` before Firefox boots, ensuring all injected extensions are pinned to the primary navigation bar immediately.
+- **Zero-Zombie Reaper**: Continuous OS-level process management cleans orphaned `geckodriver` instances, leftover lockfiles (`.parent.lock`), and socket handles automatically.
 
 ---
 
-## ⚡ Quickstart Guide: Run & Build
+## 🧰 Tech Stack & Ecosystem
 
-### 1️⃣ Installation (One-Time Setup)
+| Layer | Technology | Version | Purpose in SessionManagerPro |
+| :---: | :--- | :---: | :--- |
+| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg" width="22" height="22" /> | **Python** | `3.10+ / 3.11` | Subprocess browser worker, `invisible_playwright` engine, WebGL/Canvas spoofing & Marionette IPC |
+| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/nodejs/nodejs-original.svg" width="22" height="22" /> | **Node.js & Express** | `18+ LTS` | High-throughput backend REST API server, concurrency queue manager & real-time WebSocket telemetry hub |
+| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" width="22" height="22" /> | **React** | `19.0` | Cyber-dark glassmorphism operator dashboard, reactive state management & modular component architecture |
+| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/typescript/typescript-original.svg" width="22" height="22" /> | **TypeScript** | `5.0+` | Strict compile-time type safety across all frontend API contracts, WebSocket payloads, and UI states |
+| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/csharp/csharp-original.svg" width="22" height="22" /> | **C# / .NET** | `4.8+` | Native Windows desktop wrapper executable hosting Microsoft Edge WebView2 Evergreen |
+| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/firefox/firefox-original.svg" width="22" height="22" /> | **Mozilla Firefox** | `Latest ESR` | Stealth browsing runtime isolated with sticky SOCKS5/HTTP proxies and authentic hardware fingerprints |
+| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/vitejs/vitejs-original.svg" width="22" height="22" /> | **Vite** | `6.0+` | Sub-second frontend Hot Module Replacement (HMR) and ultra-compact production bundling |
+
+---
+
+## 🌟 Enterprise Features
+
+- 🎭 **100% Authentic Physical Fingerprints**: Zero synthetic RNG noise. Viewports, GPU models (`UNMASKED_RENDERER_WEBGL`), audio contexts, CPU threads, and RAM are mapped from genuine captured systems.
+- 📌 **Automated Toolbar Pinning**: Unpack `.xpi`, `.crx`, or `.zip` extensions and watch them appear pinned directly to Firefox’s navigation bar on frame 1 via `browser.uiCustomization.state`.
+- 🛡️ **WebRTC Leak Armor**: Strict `media.peerconnection.ice.proxy_only` routing forces WebRTC packets through your proxy tunnel, or disables WebRTC completely with 0 packet leakage.
+- ⚡ **Dynamic Concurrency Stepper**: Control concurrent session load with a live stepper bar (from 1 to 20+ profiles simultaneously) without freezing host CPU or exhausting memory.
+- 👻 **Ephemeral & Cloaked Modes**: Run disposable sessions that wipe cookies and cache on exit, or cloak sessions completely in the background without rendering an interactive GUI.
+- 🧹 **Zero-Zombie Reaper Subsystem**: Auto-detects and terminates orphaned `geckodriver` processes, leftover `.parent.lock` files, and stale port bindings automatically.
+
+---
+
+## 📂 Project Directory Layout
+
+```text
+SessionManagerPro/
+├── backend/                     # Node.js REST API server & WebSocket orchestrator
+│   └── src/                     # Express routes, session manager & browser_worker.py
+├── data/                        # Persistent profiles, session configurations & cookies
+├── docs/                        # Deep dive technical documentation guides
+│   ├── assets/                  # Local documentation assets and mascots
+│   ├── ARCHITECTURE.md          # IPC dataflow, threading model & zombie reaper specs
+│   ├── BUILD_GUIDE.md           # C# csc.exe compiler flags & Vite bundling guide
+│   ├── CONFIGURATION.md         # Proxies, hardware fingerprints & WebRTC policies
+│   └── INSTALLATION.md          # Comprehensive OS setup & venv configuration
+├── frontend/                    # Modern React 19 + Vite dashboard
+│   └── src/                     # Dashboard components, WebSocket client & cyber UI
+├── launcher/                    # C# native desktop wrapper (SessionManagerPro.cs)
+├── resources/                   # Fingerprint databases (.json.gz), proxies & extensions
+├── scripts/                     # PowerShell automation scripts (build-exe.ps1)
+└── SessionManagerPro.exe        # Standalone compiled native Windows desktop application
+```
+
+---
+
+## ⚡ Quickstart Guide
+
+### 1. Prerequisites
+- **Operating System**: Windows 10 or Windows 11 (64-bit)
+- **Node.js**: `v18.0.0` or higher ([Download Node.js](https://nodejs.org/))
+- **Python**: `3.10` or `3.11` (64-bit) ([Download Python](https://www.python.org/))
+- **WebView2**: Built into Windows 10/11 ([Evergreen Runtime](https://developer.microsoft.com/microsoft-edge/webview2/))
+
+### 2. Environment Setup
 ```powershell
-# 1. Setup Python Virtual Environment & Stealth Engine
+# 1. Initialize Python virtual environment
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install --upgrade pip
 pip install -r requirements.txt
+
+# 2. Fetch stealth browser engine
 .\.venv\Scripts\python.exe -m invisible_playwright fetch
 
-# 2. Install Node.js Dependencies
+# 3. Install Node.js dependencies
 npm install
 npm --prefix frontend install
 
-# 3. Verify Environment Health
+# 4. Verify system environment health
 npm run selfcheck
 ```
 
-### 2️⃣ Running the Application
-Choose your preferred flavor:
+### 3. Running the Application
+Select your preferred operating mode:
+
 ```powershell
-# Option A: Launch the Native Windows Desktop App (.exe)
+# Option A: Launch Native Windows Desktop App (.exe)
 npm run app
 
 # Option B: Run via Browser (Express Server + Web Dashboard)
@@ -82,9 +142,9 @@ npm start
 npm run cli
 ```
 
-### 3️⃣ Building Everything (Web Bundle + Executable)
+### 4. Compilation & Production Builds
 ```powershell
-# Compile both the React Frontend and SessionManagerPro.exe
+# Compile both the React Frontend bundle and SessionManagerPro.exe
 npm run build
 ```
 *(Or compile individually: `npm run build:ui` for React, `npm run build:exe` for C#).*
@@ -93,11 +153,11 @@ npm run build
 
 ## 📚 Deep Dive Documentation
 
-Explore in-depth technical documentation and guides:
+Click any documentation link below to read the comprehensive technical guide:
 
-| Guide | Scope & Topics | Quick Link |
+| Guide | Scope & Topics Covered | Documentation Link |
 | :--- | :--- | :--- |
-| **📦 Installation & Setup** | Operating system prerequisites, Python `.venv`, Node dependencies & self-check | [**Read docs/INSTALLATION.md ↗**](docs/INSTALLATION.md) |
+| **📦 Installation & Setup** | OS requirements, Python `.venv`, Node dependencies & self-check diagnostics | [**Read docs/INSTALLATION.md ↗**](docs/INSTALLATION.md) |
 | **🔨 Build & Compilation** | C# `.NET` `csc.exe`, Vite React bundling, and standalone `SessionManagerPro.exe` | [**Read docs/BUILD_GUIDE.md ↗**](docs/BUILD_GUIDE.md) |
 | **⚙️ Configuration & Tuning** | Sticky proxies, authentic hardware fingerprints, extensions, and WebRTC leak armor | [**Read docs/CONFIGURATION.md ↗**](docs/CONFIGURATION.md) |
 | **🏛️ System Architecture** | Process tree, stdio JSON IPC, stealth worker subsystem, and session locks | [**Read docs/ARCHITECTURE.md ↗**](docs/ARCHITECTURE.md) |
@@ -116,7 +176,7 @@ For comprehensive operating system requirements, virtual environment setup, and 
 👉 [**Read docs/INSTALLATION.md ↗**](docs/INSTALLATION.md)
 
 - Prerequisites breakdown (Windows 10/11, Node 18+, Python 3.10+, WebView2)
-- Step-by-step shell instructions
+- Step-by-step PowerShell setup instructions
 - Automated health-check verification
 </details>
 
@@ -162,34 +222,23 @@ Understand the inner workings and data flow of SessionManagerPro:
 
 ## ⌨️ Command Reference
 
-| Command | Action |
+| Command | Description |
 | :--- | :--- |
-| `npm run app` | Launches the compiled native Windows desktop application |
+| `npm run app` | Launches the compiled native Windows desktop application (`SessionManagerPro.exe`) |
 | `npm start` | Starts Express backend and opens dashboard in your default browser |
-| `npm run cli` | Launches the interactive terminal management CLI |
+| `npm run cli` | Launches the interactive terminal management CLI with interactive prompts |
 | `npm run build` | Builds both the React web bundle and compiles `SessionManagerPro.exe` |
-| `npm run build:ui` | Builds only the React 19 frontend bundle (`frontend/dist/`) |
-| `npm run build:exe` | Compiles the standalone C# WPF executable using `csc.exe` |
-| `npm run selfcheck` | Verifies Python virtual environment, dependencies, and stealth engine |
+| `npm run build:ui` | Builds only the React 19 frontend bundle into `frontend/dist/` |
+| `npm run build:exe` | Compiles the standalone C# WPF executable using system `csc.exe` |
+| `npm run selfcheck` | Verifies Python virtual environment, dependencies, and stealth engine integrity |
 
 ---
 
 ## 💖 Special Thanks & Credits
 
-SessionManagerPro stands on the shoulders of incredible open-source innovations and technologies:
+SessionManagerPro is powered by the foundational open-source stealth automation engine:
 
-- **[InvisiblePlaywright](https://github.com/)** — Groundbreaking stealth engine for authentic, undetectable Firefox browser automation.
-- **[Mozilla Firefox](https://www.mozilla.org/firefox/) & [GeckoDriver](https://github.com/mozilla/geckodriver)** — Robust, privacy-respecting browser runtime with Marionette IPC and customizable UI states.
-- **[Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)** — Lightweight native Windows Evergreen desktop embedding framework.
-- **[React 19](https://react.dev/) & [Vite](https://vitejs.dev/)** — Blazing-fast modern reactive frontend architecture and build system.
-- **[TypeScript](https://www.typescriptlang.org/)** — Strict compile-time type safety across all frontend API contracts and UI states.
-- **[Lucide Icons](https://lucide.dev/)** — Elegant, accessible iconography across the cyber dashboard.
-- **[Express](https://expressjs.com/) & [ws (WebSockets)](https://github.com/websockets/ws)** — High-performance RESTful routing and real-time bidirectional telemetry streaming.
-- **[MaxMind GeoIP](https://www.maxmind.com/)** — Accurate IP geolocation and automated egress timezone synchronization.
-- **[PySocks](https://github.com/Anorov/PySocks)** — Seamless SOCKS4, SOCKS5, and HTTP proxy protocol tunneling.
-- **[psutil](https://github.com/giampaolo/psutil)** — Cross-platform process and system telemetry for the Zero-Zombie reaper engine.
-- **[Chalk](https://github.com/chalk/chalk), [Ora](https://github.com/sindresorhus/ora), [cli-table3](https://github.com/cli-table/cli-table3) & [@inquirer/prompts](https://github.com/SBoudrias/Inquirer.js/)** — Beautiful terminal formatting, interactive prompts, and dynamic spinners.
-- **[Tenor](https://tenor.com/)** — For the delightfully cheeky laughing monkey mascot.
+- **[InvisiblePlaywright](https://github.com/)** (`invisible_playwright` & `invisible_core`) — The groundbreaking stealth engine providing authentic hardware fingerprint emulation, WebGL/Canvas spoofing, and undetectable Firefox browser automation.
 
 ---
 
