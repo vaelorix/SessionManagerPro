@@ -63,5 +63,3 @@ Configured via the **Options Modal** (sliders icon next to the launch URL bar):
 | | `Default` | Standard browser behavior without proxy isolation. |
 | **Ephemeral / Pristine Mode** | `true / false` | Prevents writing cookies, cache, or history back to disk on exit (leaves profile pristine). |
 | **Cloaked Background** | `true / false` | Runs profile headlessly in the background without rendering an interactive GUI desktop window. |
-
-<!-- docs: toolbar pinning -->

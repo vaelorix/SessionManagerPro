@@ -602,5 +602,3 @@ export const ExtensionPanel: React.FC<Props> = ({
     </>
   );
 };
-
-// [style] spacious layout

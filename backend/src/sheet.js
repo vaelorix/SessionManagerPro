@@ -296,5 +296,3 @@ module.exports = {
   openSessionSheet,
   openSessionCsv,
 };
-
-// [sheet] recovery email

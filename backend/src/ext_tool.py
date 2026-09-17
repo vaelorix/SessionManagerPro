@@ -168,5 +168,3 @@ if __name__ == "__main__":
         print(json.dumps(res))
     else:
         print(json.dumps({"error": f"Unknown command: {cmd}"}))
-
-# [ext] zip and crx

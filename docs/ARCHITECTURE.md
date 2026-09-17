@@ -59,5 +59,3 @@ graph TD
   - Strict proxy routing (DNS remote resolution, socks5 authentication).
   - WebRTC candidate filtering (`media.peerconnection.ice.proxy_only`).
   - Pre-boots extension placement directly in `placements['nav-bar']` to guarantee frame-1 toolbar pinning.
-
-<!-- docs: customizableui -->

@@ -484,5 +484,3 @@ export const SpecsModal: React.FC<{ fp: any; title: string; onClose: () => void 
     <Specs fp={fp} />
   </Modal>
 );
-
-// [modals] focus trap

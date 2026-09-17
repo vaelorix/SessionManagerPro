@@ -415,5 +415,3 @@ export const ProfileDrawer: React.FC<Props> = ({
     </>
   );
 };
-
-// [style] cookie viewer

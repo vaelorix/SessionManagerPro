@@ -403,5 +403,3 @@ export const ProxyPanel: React.FC<Props> = ({
     </>
   );
 };
-
-// [feat] latency logic

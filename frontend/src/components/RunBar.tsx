@@ -451,5 +451,3 @@ export const RunBar: React.FC<Props> = ({
     </>
   );
 };
-
-// [style] dark glass modal

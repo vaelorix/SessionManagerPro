@@ -250,5 +250,3 @@ if (process.stdin.isTTY) {
 }
 
 connect();
-
-// [logger] timestamp ms

@@ -86,5 +86,3 @@ export const StatusBar: React.FC<Props> = ({
     </div>
   </div>
 );
-
-// [style] live pulse

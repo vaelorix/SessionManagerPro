@@ -648,5 +648,3 @@ if (require.main === module) {
 }
 
 module.exports = { app, server, startServer, openTerminalLogger };
-
-// [perf] websocket rate

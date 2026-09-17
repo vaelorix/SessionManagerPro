@@ -600,5 +600,3 @@ export function useElapsed(since?: string | null) {
   }, [since]);
   return label;
 }
-
-// [ui] cyber switch component
