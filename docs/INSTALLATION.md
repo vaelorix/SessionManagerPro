@@ -66,5 +66,6 @@ selfcheck ok — Python 3.11.x + invisible_playwright stealth engine verified
 
 ## 🚀 Next Steps
 
-- Check out the [Build Guide](file:///docs/BUILD_GUIDE.md) to compile the native desktop launcher.
-- Check out the [Configuration Guide](file:///docs/CONFIGURATION.md) to import proxies and authentic fingerprints.
+- Check out the [**Build Guide ↗**](BUILD_GUIDE.md) to compile the native desktop launcher.
+- Check out the [**Configuration Guide ↗**](CONFIGURATION.md) to import proxies and authentic fingerprints.
+- Check out the [**System Architecture Guide ↗**](ARCHITECTURE.md) to explore the internal engine mechanics.

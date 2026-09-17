@@ -1,7 +1,7 @@
 <div align="center">
 
-<!-- Centered Animated Laughing Monkey Mascot -->
-<img src="https://media1.tenor.com/m/JcZ0DZJbD9cAAAAC/monkey-laught.gif" width="220" alt="Laughing Monkey Mascot" style="border-radius: 18px; box-shadow: 0 12px 36px rgba(0,0,0,0.5);" />
+<!-- Centered Animated Laughing Monkey Mascot (Rendered from local asset for 100% reliability on GitHub) -->
+<img src="docs/assets/monkey.gif" width="220" alt="Laughing Monkey Mascot" style="border-radius: 18px; box-shadow: 0 12px 36px rgba(0,0,0,0.5);" />
 
 # 🐵 SessionManagerPro (SMP)
 ### *The Ultimate Multi-Threaded Anti-Detect Stealth Browser Orchestrator* 🎭✨
@@ -93,14 +93,27 @@ npm run build
 
 ## 📚 Deep Dive Documentation
 
-Click any dropdown to view detailed guides:
+Explore in-depth technical documentation and guides:
 
-<details>
+| Guide | Scope & Topics | Quick Link |
+| :--- | :--- | :--- |
+| **📦 Installation & Setup** | Operating system prerequisites, Python `.venv`, Node dependencies & self-check | [**Read docs/INSTALLATION.md ↗**](docs/INSTALLATION.md) |
+| **🔨 Build & Compilation** | C# `.NET` `csc.exe`, Vite React bundling, and standalone `SessionManagerPro.exe` | [**Read docs/BUILD_GUIDE.md ↗**](docs/BUILD_GUIDE.md) |
+| **⚙️ Configuration & Tuning** | Sticky proxies, authentic hardware fingerprints, extensions, and WebRTC leak armor | [**Read docs/CONFIGURATION.md ↗**](docs/CONFIGURATION.md) |
+| **🏛️ System Architecture** | Process tree, stdio JSON IPC, stealth worker subsystem, and session locks | [**Read docs/ARCHITECTURE.md ↗**](docs/ARCHITECTURE.md) |
+
+---
+
+### 🔍 Interactive Topic Explorer
+
+Click any dropdown below to preview topic outlines:
+
+<details open>
 <summary><b>📦 Detailed Installation Guide (Prerequisites, Python venv, Node setup)</b></summary>
 <br/>
 
-For comprehensive operating system requirements, virtual environment setup, and dependency troubleshooting, consult:
-👉 **[Read docs/INSTALLATION.md](file:///docs/INSTALLATION.md)**
+For comprehensive operating system requirements, virtual environment setup, and dependency troubleshooting, consult:  
+👉 [**Read docs/INSTALLATION.md ↗**](docs/INSTALLATION.md)
 
 - Prerequisites breakdown (Windows 10/11, Node 18+, Python 3.10+, WebView2)
 - Step-by-step shell instructions
@@ -111,8 +124,8 @@ For comprehensive operating system requirements, virtual environment setup, and 
 <summary><b>🔨 Build & Compilation Guide (C# csc.exe, Vite, Binary Outputs)</b></summary>
 <br/>
 
-Learn how the hybrid architecture compiles from source into a standalone Windows binary:
-👉 **[Read docs/BUILD_GUIDE.md](file:///docs/BUILD_GUIDE.md)**
+Learn how the hybrid architecture compiles from source into a standalone Windows binary:  
+👉 [**Read docs/BUILD_GUIDE.md ↗**](docs/BUILD_GUIDE.md)
 
 - How `scripts/build-exe.ps1` compiles `SessionManagerPro.exe` using .NET `csc.exe`
 - How `vite build` bundles the frontend into `frontend/dist/`
@@ -123,8 +136,8 @@ Learn how the hybrid architecture compiles from source into a standalone Windows
 <summary><b>⚙️ Configuration & Tuning Guide (Proxies, Fingerprints, Extensions, WebRTC)</b></summary>
 <br/>
 
-Detailed instructions on fine-tuning sessions, proxies, and extensions:
-👉 **[Read docs/CONFIGURATION.md](file:///docs/CONFIGURATION.md)**
+Detailed instructions on fine-tuning sessions, proxies, and extensions:  
+👉 [**Read docs/CONFIGURATION.md ↗**](docs/CONFIGURATION.md)
 
 - Proxy authentication formats (HTTP, SOCKS4, SOCKS5)
 - Authentic fingerprint library mapping vs synthetic RNG detection
@@ -136,8 +149,8 @@ Detailed instructions on fine-tuning sessions, proxies, and extensions:
 <summary><b>🏛️ System Architecture & Internal Mechanics</b></summary>
 <br/>
 
-Understand the inner workings and data flow of SessionManagerPro:
-👉 **[Read docs/ARCHITECTURE.md](file:///docs/ARCHITECTURE.md)**
+Understand the inner workings and data flow of SessionManagerPro:  
+👉 [**Read docs/ARCHITECTURE.md ↗**](docs/ARCHITECTURE.md)
 
 - Architecture diagram (WPF WebView2 ➔ Node.js WebSocket ➔ Python Worker ➔ Firefox)
 - IPC communication over JSON-lines stdio
@@ -158,6 +171,25 @@ Understand the inner workings and data flow of SessionManagerPro:
 | `npm run build:ui` | Builds only the React 19 frontend bundle (`frontend/dist/`) |
 | `npm run build:exe` | Compiles the standalone C# WPF executable using `csc.exe` |
 | `npm run selfcheck` | Verifies Python virtual environment, dependencies, and stealth engine |
+
+---
+
+## 💖 Special Thanks & Credits
+
+SessionManagerPro stands on the shoulders of incredible open-source innovations and technologies:
+
+- **[InvisiblePlaywright](https://github.com/)** — Groundbreaking stealth engine for authentic, undetectable Firefox browser automation.
+- **[Mozilla Firefox](https://www.mozilla.org/firefox/) & [GeckoDriver](https://github.com/mozilla/geckodriver)** — Robust, privacy-respecting browser runtime with Marionette IPC and customizable UI states.
+- **[Microsoft Edge WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)** — Lightweight native Windows Evergreen desktop embedding framework.
+- **[React 19](https://react.dev/) & [Vite](https://vitejs.dev/)** — Blazing-fast modern reactive frontend architecture and build system.
+- **[TypeScript](https://www.typescriptlang.org/)** — Strict compile-time type safety across all frontend API contracts and UI states.
+- **[Lucide Icons](https://lucide.dev/)** — Elegant, accessible iconography across the cyber dashboard.
+- **[Express](https://expressjs.com/) & [ws (WebSockets)](https://github.com/websockets/ws)** — High-performance RESTful routing and real-time bidirectional telemetry streaming.
+- **[MaxMind GeoIP](https://www.maxmind.com/)** — Accurate IP geolocation and automated egress timezone synchronization.
+- **[PySocks](https://github.com/Anorov/PySocks)** — Seamless SOCKS4, SOCKS5, and HTTP proxy protocol tunneling.
+- **[psutil](https://github.com/giampaolo/psutil)** — Cross-platform process and system telemetry for the Zero-Zombie reaper engine.
+- **[Chalk](https://github.com/chalk/chalk), [Ora](https://github.com/sindresorhus/ora), [cli-table3](https://github.com/cli-table/cli-table3) & [@inquirer/prompts](https://github.com/SBoudrias/Inquirer.js/)** — Beautiful terminal formatting, interactive prompts, and dynamic spinners.
+- **[Tenor](https://tenor.com/)** — For the delightfully cheeky laughing monkey mascot.
 
 ---
 

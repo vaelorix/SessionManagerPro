@@ -63,3 +63,11 @@ Configured via the **Options Modal** (sliders icon next to the launch URL bar):
 | | `Default` | Standard browser behavior without proxy isolation. |
 | **Ephemeral / Pristine Mode** | `true / false` | Prevents writing cookies, cache, or history back to disk on exit (leaves profile pristine). |
 | **Cloaked Background** | `true / false` | Runs profile headlessly in the background without rendering an interactive GUI desktop window. |
+
+---
+
+## 🚀 Next Steps
+
+- Return to the [**Main README ↗**](../README.md)
+- Check out the [**Installation Guide ↗**](INSTALLATION.md) for environment requirements.
+- Check out the [**System Architecture Guide ↗**](ARCHITECTURE.md) to explore the internal engine mechanics.

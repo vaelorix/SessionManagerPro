@@ -59,3 +59,11 @@ graph TD
   - Strict proxy routing (DNS remote resolution, socks5 authentication).
   - WebRTC candidate filtering (`media.peerconnection.ice.proxy_only`).
   - Pre-boots extension placement directly in `placements['nav-bar']` to guarantee frame-1 toolbar pinning.
+
+---
+
+## 🚀 Next Steps
+
+- Return to the [**Main README ↗**](../README.md)
+- Check out the [**Installation Guide ↗**](INSTALLATION.md) for environment requirements.
+- Check out the [**Configuration Guide ↗**](CONFIGURATION.md) to fine-tune proxies and authentic fingerprints.
