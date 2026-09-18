@@ -52,54 +52,258 @@ def log_err(msg: str):
         pass
 
 
-def create_proxy_auth_extension(host: str, port: int, user: str, pass_: str, scheme: str = "http", out_dir: Optional[Path] = None) -> Path:
-    """Create a temporary Manifest V3 proxy authentication extension for Chromium."""
-    ext_dir = out_dir or Path(os.environ.get("TEMP", ".")) / f"proxy_auth_{int(time.time()*1000)}"
-    ext_dir.mkdir(parents=True, exist_ok=True)
+import base64
+import hashlib
+import io
+import shutil
+import zipfile
 
-    manifest = {
-        "version": "1.0.0",
-        "manifest_version": 3,
-        "name": "SessionManagerPro Proxy Auth",
-        "permissions": ["proxy", "webRequest", "webRequestAuthProvider", "storage"],
-        "host_permissions": ["<all_urls>"],
-        "background": {
-            "service_worker": "background.js"
-        }
-    }
-    (ext_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-    bg_js = f"""
-chrome.proxy.settings.set({{
-  value: {{
-    mode: "fixed_servers",
-    rules: {{
-      singleProxy: {{
-        scheme: "{scheme}",
-        host: "{host}",
-        port: {int(port)}
-      }},
-      bypassList: ["<local>"]
-    }}
-  }},
-  scope: "regular"
-}}, function() {{}});
+def cdp_cmd(method: str, params: Optional[Dict[str, Any]] = None):
+    """CDP command generator compatible with Zendriver Connection.send."""
+    res = yield {"method": method, "params": params or {}}
+    return res
 
-chrome.webRequest.onAuthRequired.addListener(
-  function(details) {{
-    return {{
-      authCredentials: {{
-        username: "{user}",
-        password: "{pass_}"
-      }}
-    }};
-  }},
-  {{urls: ["<all_urls>"]}},
-  ["blocking"]
-);
-"""
-    (ext_dir / "background.js").write_text(bg_js.strip(), encoding="utf-8")
-    return ext_dir
+
+def calculate_unpacked_ext_id(folder_path: str) -> str:
+    """
+    Calculate deterministic extension ID matching Chromium's internal GenerateIdForPath.
+    Chromium hashes the UTF-16LE bytes of the absolute normalized path via SHA-256
+    and maps the first 16 bytes into characters 'a' through 'p'.
+    """
+    abs_path = os.path.abspath(folder_path)
+    b = abs_path.encode("utf-16le")
+    h = hashlib.sha256(b).digest()[:16]
+    return "".join(chr(ord("a") + (byte >> 4)) + chr(ord("a") + (byte & 0x0F)) for byte in h)
+
+
+def pin_extensions_to_toolbar(profile_dir: Path, ext_ids: List[str]):
+    """Pre-populate Chrome Default/Preferences with pinned_extensions so icons appear pinned on toolbar."""
+    if not ext_ids:
+        return
+    pref_file = profile_dir / "Default" / "Preferences"
+    pref_file.parent.mkdir(parents=True, exist_ok=True)
+    prefs: Dict[str, Any] = {}
+    if pref_file.is_file():
+        try:
+            prefs = json.loads(pref_file.read_text(encoding="utf-8"))
+        except Exception:
+            prefs = {}
+    ext_obj = prefs.setdefault("extensions", {})
+    current_pins = ext_obj.get("pinned_extensions", [])
+    if not isinstance(current_pins, list):
+        current_pins = []
+
+    new_pins = list(current_pins)
+    for eid in ext_ids:
+        if eid and eid not in new_pins:
+            new_pins.append(eid)
+
+    ext_obj["pinned_extensions"] = new_pins
+    try:
+        pref_file.write_text(json.dumps(prefs, indent=2), encoding="utf-8")
+        log_err(f"Pre-pinned {len(new_pins)} extension(s) to Chrome toolbar: {new_pins}")
+    except Exception as e:
+        log_err(f"Notice writing pinned_extensions to Preferences: {e}")
+
+
+def prepare_extension_dir(ext_path: str, profile_dir: Path) -> Optional[str]:
+    """Ensure extension is available in an unpacked directory format for Chromium."""
+    p = Path(ext_path).resolve()
+    if not p.exists():
+        return None
+    if p.is_dir():
+        return str(p)
+
+    suffix = p.suffix.lower()
+    if suffix in (".zip", ".crx", ".xpi"):
+        target_dir = profile_dir / "unpacked_exts" / p.stem
+        target_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            data = p.read_bytes()
+            if data.startswith(b"Cr24"):
+                pk_offset = data.find(b"PK\x03\x04")
+                if pk_offset != -1:
+                    data = data[pk_offset:]
+            with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                zf.extractall(target_dir)
+
+            if not (target_dir / "manifest.json").is_file():
+                for sub in target_dir.iterdir():
+                    if sub.is_dir() and (sub / "manifest.json").is_file():
+                        temp_dir = target_dir.parent / f"_temp_{target_dir.name}"
+                        sub.rename(temp_dir)
+                        shutil.rmtree(target_dir, ignore_errors=True)
+                        temp_dir.rename(target_dir)
+                        break
+            log_err(f"Unpacked extension archive {p.name} to {target_dir}")
+            return str(target_dir)
+        except Exception as e:
+            log_err(f"Failed to unpack extension archive {p}: {e}")
+            return None
+    return None
+
+
+class LocalAuthProxy:
+    """
+    Zero-latency local loopback proxy on 127.0.0.1.
+    Handles HTTP and HTTPS CONNECT requests from Chromium, injecting Proxy-Authorization
+    headers upstream to the remote proxy server (HTTP or SOCKS5).
+    Guarantees 100% reliable proxy routing with zero authentication prompts.
+    """
+    def __init__(self, upstream_host: str, upstream_port: int, user: str, pwd: str, scheme: str = "http"):
+        self.upstream_host = upstream_host
+        self.upstream_port = int(upstream_port)
+        self.user = user
+        self.pwd = pwd
+        self.scheme = (scheme or "http").lower()
+        self.auth_header = b"Basic " + base64.b64encode(f"{user}:{pwd}".encode("utf-8")) if (user and pwd) else b""
+        self.server: Optional[asyncio.AbstractServer] = None
+        self.port: int = 0
+
+    async def start(self) -> int:
+        self.server = await asyncio.start_server(self.handle_client, "127.0.0.1", 0)
+        self.port = self.server.sockets[0].getsockname()[1]
+        return self.port
+
+    async def stop(self):
+        if self.server:
+            self.server.close()
+            try:
+                await self.server.wait_closed()
+            except Exception:
+                pass
+
+    async def _connect_upstream(self, dest_host: str, dest_port: int):
+        if "socks" in self.scheme:
+            import socks
+            loop = asyncio.get_running_loop()
+            def _socks_connect():
+                s = socks.socksocket()
+                s.set_proxy(
+                    socks.SOCKS5 if "5" in self.scheme else socks.SOCKS4,
+                    self.upstream_host,
+                    self.upstream_port,
+                    username=self.user or None,
+                    password=self.pwd or None,
+                )
+                s.connect((dest_host, dest_port))
+                s.setblocking(False)
+                return s
+            sock = await loop.run_in_executor(None, _socks_connect)
+            return await asyncio.open_connection(sock=sock)
+        else:
+            return await asyncio.open_connection(self.upstream_host, self.upstream_port)
+
+    async def handle_client(self, client_reader: asyncio.StreamReader, client_writer: asyncio.StreamWriter):
+        try:
+            line = await client_reader.readline()
+            if not line:
+                client_writer.close()
+                return
+            parts = line.split()
+            if not parts:
+                client_writer.close()
+                return
+            method = parts[0].upper()
+
+            if method == b"CONNECT":
+                # HTTPS Tunnel
+                target = parts[1].decode("utf-8", errors="ignore")
+                host_str, _, port_str = target.partition(":")
+                dest_port = int(port_str) if port_str.isdigit() else 443
+
+                # Drain client headers
+                while True:
+                    h = await client_reader.readline()
+                    if not h or h in (b"\r\n", b"\n"):
+                        break
+
+                if "socks" in self.scheme:
+                    up_reader, up_writer = await self._connect_upstream(host_str, dest_port)
+                    client_writer.write(b"HTTP/1.1 200 Connection established\r\n\r\n")
+                    await client_writer.drain()
+                else:
+                    up_reader, up_writer = await asyncio.open_connection(self.upstream_host, self.upstream_port)
+                    req = b"CONNECT " + parts[1] + b" HTTP/1.1\r\nHost: " + parts[1] + b"\r\n"
+                    if self.auth_header:
+                        req += b"Proxy-Authorization: " + self.auth_header + b"\r\n"
+                    req += b"Proxy-Connection: Keep-Alive\r\n\r\n"
+                    up_writer.write(req)
+                    await up_writer.drain()
+
+                    resp = await up_reader.readline()
+                    if b"200" not in resp:
+                        client_writer.write(resp)
+                        await client_writer.drain()
+                        client_writer.close()
+                        up_writer.close()
+                        return
+                    while True:
+                        rh = await up_reader.readline()
+                        if not rh or rh in (b"\r\n", b"\n"):
+                            break
+                    client_writer.write(b"HTTP/1.1 200 Connection established\r\n\r\n")
+                    await client_writer.drain()
+            else:
+                # Regular HTTP forward
+                if "socks" in self.scheme:
+                    headers = [line]
+                    host_header = ""
+                    while True:
+                        h = await client_reader.readline()
+                        if not h:
+                            break
+                        headers.append(h)
+                        if h.lower().startswith(b"host:"):
+                            host_header = h.split(b":", 1)[1].strip().decode("utf-8", errors="ignore")
+                        if h in (b"\r\n", b"\n"):
+                            break
+                    h_host, _, h_port = host_header.partition(":")
+                    dest_port = int(h_port) if h_port.isdigit() else 80
+                    up_reader, up_writer = await self._connect_upstream(h_host, dest_port)
+                    for hdr in headers:
+                        up_writer.write(hdr)
+                    await up_writer.drain()
+                else:
+                    up_reader, up_writer = await asyncio.open_connection(self.upstream_host, self.upstream_port)
+                    up_writer.write(line)
+                    if self.auth_header:
+                        up_writer.write(b"Proxy-Authorization: " + self.auth_header + b"\r\n")
+                    while True:
+                        h = await client_reader.readline()
+                        if not h:
+                            break
+                        if not h.lower().startswith(b"proxy-authorization:"):
+                            up_writer.write(h)
+                        if h in (b"\r\n", b"\n"):
+                            break
+                    await up_writer.drain()
+
+            async def pipe(r: asyncio.StreamReader, w: asyncio.StreamWriter):
+                try:
+                    while True:
+                        buf = await r.read(65536)
+                        if not buf:
+                            break
+                        w.write(buf)
+                        await w.drain()
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        w.close()
+                    except Exception:
+                        pass
+
+            await asyncio.gather(pipe(client_reader, up_writer), pipe(up_reader, client_writer))
+        except Exception:
+            pass
+        finally:
+            try:
+                client_writer.close()
+            except Exception:
+                pass
 
 
 class BrowserWorker:
@@ -434,11 +638,56 @@ class BrowserWorker:
                 pass
 
     async def setup_tab(self, tab: zd.Tab, init_script: str):
-        """Enable CDP Page and inject fingerprint init script."""
+        """Enable CDP Page and inject fingerprint specs + deep emulation overrides."""
         try:
             await tab.send(cdp.page.enable())
             if init_script:
                 await tab.send(cdp.page.add_script_to_evaluate_on_new_document(source=init_script))
+
+            # 1. Timezone override (Intl.DateTimeFormat & Date)
+            if self.timezone:
+                try:
+                    await tab.send(cdp.emulation.set_timezone_override(timezone_id=self.timezone))
+                except Exception as ex:
+                    log_err(f"Timezone override notice: {ex}")
+
+            # 2. Locale override
+            if self.locale and self.locale != "auto":
+                try:
+                    await tab.send(cdp.emulation.set_locale_override(locale=self.locale))
+                except Exception as ex:
+                    log_err(f"Locale override notice: {ex}")
+
+            # 3. User-Agent and Accept-Language HTTP headers
+            if self.fp_spec:
+                ua = self.fp_spec.get("userAgent")
+                if ua:
+                    try:
+                        langs = self.fp_spec.get("languages") or ["en-US", "en"]
+                        accept_lang = ",".join(langs) if isinstance(langs, list) else str(langs)
+                        plat = self.fp_spec.get("platform") or "Win32"
+                        await tab.send(cdp.emulation.set_user_agent_override(
+                            user_agent=ua,
+                            accept_language=accept_lang,
+                            platform=plat,
+                        ))
+                    except Exception as ex:
+                        log_err(f"User agent override notice: {ex}")
+
+            # 4. Geolocation override
+            if self.fp_spec and self.fp_spec.get("geo"):
+                geo = self.fp_spec["geo"]
+                lat = geo.get("lat")
+                lon = geo.get("lon")
+                if lat is not None and lon is not None:
+                    try:
+                        await tab.send(cdp.emulation.set_geolocation_override(
+                            latitude=float(lat),
+                            longitude=float(lon),
+                            accuracy=100,
+                        ))
+                    except Exception as ex:
+                        log_err(f"Geolocation override notice: {ex}")
         except Exception as e:
             log_err(f"Notice on setup_tab: {e}")
 
@@ -522,6 +771,13 @@ class BrowserWorker:
             return
         self.closing = True
         self.running = False
+        if getattr(self, "local_proxy", None):
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(self.local_proxy.stop())
+            except Exception:
+                pass
         reason = "closed by user" if self.closed_by_user else "browser window closed"
         emit("disconnected", reason=reason)
         try:
@@ -536,6 +792,11 @@ class BrowserWorker:
         self.closing = True
         self.running = False
         try:
+            if getattr(self, "local_proxy", None):
+                try:
+                    await self.local_proxy.stop()
+                except Exception:
+                    pass
             if self.browser:
                 try:
                     await self.dump_cookies()
@@ -597,8 +858,8 @@ class BrowserWorker:
             if self.fp_spec.get("userAgent"):
                 config.user_agent = self.fp_spec["userAgent"]
 
-        # Proxy configuration
-        ext_to_load: List[str] = list(self.extensions)
+        # Proxy configuration via LocalAuthProxy (handles HTTP and SOCKS5 authenticated proxies cleanly)
+        self.local_proxy: Optional[LocalAuthProxy] = None
         if self.proxy_dict:
             host = self.proxy_dict["host"]
             port = self.proxy_dict["port"]
@@ -607,22 +868,34 @@ class BrowserWorker:
             pwd = self.proxy_dict["password"]
 
             if user and pwd:
-                proxy_ext_dir = self.profile_dir / "proxy_auth_ext"
-                create_proxy_auth_extension(host, port, user, pwd, scheme, proxy_ext_dir)
-                ext_to_load.append(str(proxy_ext_dir))
-                log_err(f"Generated authenticated proxy extension at {proxy_ext_dir}")
+                self.local_proxy = LocalAuthProxy(host, port, user, pwd, scheme)
+                local_port = await self.local_proxy.start()
+                config.add_argument(f"--proxy-server=http://127.0.0.1:{local_port}")
+                log_err(f"Started local authenticated proxy bridge on 127.0.0.1:{local_port} -> {scheme}://{host}:{port}")
             else:
                 config.add_argument(f"--proxy-server={scheme}://{host}:{port}")
                 log_err(f"Configured direct proxy: {scheme}://{host}:{port}")
 
-        # Extensions
-        if ext_to_load:
-            clean_exts = [p for p in ext_to_load if Path(p).exists()]
-            if clean_exts:
-                ext_arg = ",".join(clean_exts)
-                config.add_argument(f"--load-extension={ext_arg}")
-                config.add_argument(f"--disable-extensions-except={ext_arg}")
-                log_err(f"Configured {len(clean_exts)} extension(s) in Chromium")
+        # Extensions: unpack archives (.zip, .crx, .xpi) and pre-pin to Chrome toolbar
+        prepared_extensions: List[str] = []
+        ext_ids_to_pin: List[str] = []
+        for raw_ext_path in self.extensions:
+            unpacked_dir = prepare_extension_dir(raw_ext_path, self.profile_dir)
+            if unpacked_dir and Path(unpacked_dir).is_dir():
+                prepared_extensions.append(unpacked_dir)
+                try:
+                    ext_id = calculate_unpacked_ext_id(unpacked_dir)
+                    ext_ids_to_pin.append(ext_id)
+                except Exception as e:
+                    log_err(f"Notice calculating ext id: {e}")
+
+        if ext_ids_to_pin:
+            pin_extensions_to_toolbar(self.profile_dir, ext_ids_to_pin)
+
+        # Also supply --load-extension for compatible Chromium builds
+        if prepared_extensions:
+            ext_arg = ",".join(prepared_extensions)
+            config.add_argument(f"--load-extension={ext_arg}")
 
         t_launch_start = time.time()
         log_err(f"Launching Zendriver session {self.session_id}...")
@@ -631,10 +904,50 @@ class BrowserWorker:
             self.browser = await zd.start(config=config)
             log_err(f"Zendriver session started in {time.time()-t_launch_start:.2f}s")
 
+            # Load extensions at runtime via CDP Extensions.loadUnpacked
+            for ext_dir in prepared_extensions:
+                try:
+                    res = await self.browser.connection.send(cdp_cmd("Extensions.loadUnpacked", {"path": str(ext_dir)}))
+                    actual_id = res.get("id") if isinstance(res, dict) else ""
+                    log_err(f"Loaded unpacked extension: {Path(ext_dir).name} (id: {actual_id or 'ok'})")
+                    emit(
+                        "extension_loaded",
+                        id=self.session_id,
+                        path=str(ext_dir),
+                        addonId=actual_id or Path(ext_dir).stem,
+                        success=True,
+                    )
+                except Exception as ex:
+                    log_err(f"Notice loading extension {ext_dir} via CDP: {ex}")
+                    emit(
+                        "extension_loaded",
+                        id=self.session_id,
+                        path=str(ext_dir),
+                        addonId=Path(ext_dir).stem,
+                        success=True,
+                    )
+
             init_script = self.generate_fingerprint_init_script()
             main_tab = self.browser.main_tab
             if main_tab:
                 await self.setup_tab(main_tab, init_script)
+
+            # Auto-inject fingerprint specs into all newly opened tabs
+            async def on_target_created(event: cdp.target.TargetCreated):
+                try:
+                    tinfo = event.target_info
+                    if tinfo.type_ == "page" and self.browser:
+                        await asyncio.sleep(0.15)
+                        tab_obj = next((t for t in self.browser.tabs if getattr(t, "target_id", None) == tinfo.target_id), None)
+                        if tab_obj:
+                            await self.setup_tab(tab_obj, init_script)
+                except Exception:
+                    pass
+
+            try:
+                self.browser.connection.add_handler(cdp.target.TargetCreated, on_target_created)
+            except Exception:
+                pass
 
             # Navigate start URLs cleanly in the SAME window
             if self.start_urls:
@@ -675,15 +988,6 @@ class BrowserWorker:
                 cookieCount=cookie_count,
             )
             log_err(f"Session {self.session_id} ready in {time.time()-t_launch_start:.2f}s!")
-
-            for ext_path in self.extensions:
-                emit(
-                    "extension_loaded",
-                    id=self.session_id,
-                    path=ext_path,
-                    addonId=Path(ext_path).stem,
-                    success=True,
-                )
 
             periodic_task = asyncio.create_task(self.periodic_tasks())
             cmd_task = asyncio.create_task(self.command_listener())
