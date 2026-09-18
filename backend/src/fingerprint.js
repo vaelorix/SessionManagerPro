@@ -24,8 +24,8 @@ function listFptFiles() {
   const all = fs
     .readdirSync(FPTS_DIR)
     .filter((f) => f.endsWith(".json.gz") || f.endsWith(".json"));
-  // Prioritize genuine Chrome fingerprints (exclude Brave and Firefox)
-  const chromeFiles = all.filter((f) => f.endsWith("_C.json.gz") && !f.includes("_BR_"));
+  // Prioritize genuine Chrome fingerprints (_C.json.gz)
+  const chromeFiles = all.filter((f) => f.endsWith("_C.json.gz"));
   return chromeFiles.length > 0 ? chromeFiles : all;
 }
 

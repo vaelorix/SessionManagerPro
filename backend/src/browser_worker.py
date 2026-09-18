@@ -448,6 +448,57 @@ class BrowserWorker:
 
         return fpt_data
 
+    def get_user_agent_metadata(self) -> Optional[cdp.emulation.UserAgentMetadata]:
+        """Extract and construct CDP UserAgentMetadata from raw fingerprint or fp_spec."""
+        uad_obj: Dict[str, Any] = {}
+        uad_raw = (self.fpt_data or {}).get("useragentdata")
+        if uad_raw:
+            try:
+                uad_obj = json.loads(base64.b64decode(uad_raw).decode("utf-8"))
+            except Exception:
+                pass
+        if not uad_obj and self.fp_spec and self.fp_spec.get("userAgentData"):
+            uad_obj = self.fp_spec["userAgentData"]
+
+        if not uad_obj:
+            return None
+
+        brands_list = uad_obj.get("brands") or []
+        full_brands_list = uad_obj.get("fullVersionList") or []
+
+        brands_cdp = [
+            cdp.emulation.UserAgentBrandVersion(brand=str(b.get("brand", "")), version=str(b.get("version", "")))
+            for b in brands_list
+            if isinstance(b, dict) and b.get("brand")
+        ]
+        full_brands_cdp = [
+            cdp.emulation.UserAgentBrandVersion(brand=str(b.get("brand", "")), version=str(b.get("version", "")))
+            for b in full_brands_list
+            if isinstance(b, dict) and b.get("brand")
+        ]
+
+        full_version = str(uad_obj.get("fullVersion") or "")
+        platform = str(uad_obj.get("platform") or "Windows")
+        platform_version = str(uad_obj.get("platformVersion") or "10.0.0")
+        architecture = str(uad_obj.get("architecture") or "x86")
+        model = str(uad_obj.get("model") or "")
+        mobile = bool(uad_obj.get("mobile", False))
+        bitness = str(uad_obj.get("bitness") or "64")
+        wow64 = bool(uad_obj.get("wow64", False))
+
+        return cdp.emulation.UserAgentMetadata(
+            brands=brands_cdp,
+            full_version_list=full_brands_cdp,
+            full_version=full_version,
+            platform=platform,
+            platform_version=platform_version,
+            architecture=architecture,
+            model=model,
+            mobile=mobile,
+            bitness=bitness,
+            wow64=wow64,
+        )
+
     def generate_fingerprint_init_script(self) -> str:
         """Generate JavaScript to inject exact fingerprint specs into all frames before page load."""
         if not self.fp_spec and not self.fpt_data:
@@ -597,55 +648,28 @@ class BrowserWorker:
       }} catch (e) {{}}
     }}
 
-    // 3. WebGL GPU Unmasked Vendor, Renderer & full parameters
-    const wp = {json.dumps(wp)};
-    const webglMap = {{
-      37445: wp.unmaskedVendor || 'Google Inc. (Intel)',
-      37446: wp.unmaskedRenderer || 'ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)',
-      7936: wp.vendor || 'WebKit',
-      7937: wp.renderer || 'WebKit WebGL',
-      7938: wp.version || 'WebGL 1.0 (OpenGL ES 2.0 Chromium)',
-      35724: wp.shadingLanguage || 'WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Chromium)',
-      34047: Number(wp.maxAnisotropy || 16),
-      3413: Number(wp.alphaBits || 8),
-      3412: Number(wp.blueBits || 8),
-      3414: Number(wp.depthBits || 24),
-      3411: Number(wp.greenBits || 8),
-      3410: Number(wp.redBits || 8),
-      3415: Number(wp.stencilBits || 8),
-      34074: Number(wp.subpixelBits || 4),
-      35661: Number(wp.maxCombinedTextureImageUnits || 32),
-      34076: Number(wp.maxCubeMapTextureSize || 16384),
-      36349: Number(wp.maxFragmentUniformVectors || 1024),
-      34024: Number(wp.maxRenderBufferSize || 16384),
-      34930: Number(wp.maxTextureImageUnits || 16),
-      3379: Number(wp.maxTextureSize || 16384),
-      36348: Number(wp.maxVaryingVectors || 30),
-      34921: Number(wp.maxVertexAttribs || 16),
-      35660: Number(wp.maxVertexTextureImageUnits || 16),
-      36347: Number(wp.maxVertexUniformVectors || 4096),
-      32936: Number(wp.sampleBuffers || 0),
-      32937: Number(wp.samples || 0)
-    }};
-
-    function patchWebGL(proto, isWebgl2) {{
+    // 3. WebGL debug renderer info sanitization (Brave & virtualization leaks)
+    function sanitizeWebGL(proto) {{
       if (!proto || !proto.getParameter) return;
       const origGetParameter = proto.getParameter;
-      const wrapped = wrapNative(function getParameter(param) {{
+      proto.getParameter = wrapNative(function getParameter(param) {{
         if (!(this instanceof proto.constructor)) {{
           return origGetParameter.apply(this, arguments);
         }}
-        if (param === 37445) return webglMap[37445];
-        if (param === 37446) return webglMap[37446];
-        if (param === 7938) return isWebgl2 ? (wp.version2 || webglMap[7938]) : webglMap[7938];
-        if (param === 35724) return isWebgl2 ? (wp.shadingLanguage2 || webglMap[35724]) : webglMap[35724];
-        if (param === 33902) return new Float32Array([wp.aliasedLineWidthRange ? wp.aliasedLineWidthRange['0'] : 1, wp.aliasedLineWidthRange ? wp.aliasedLineWidthRange['1'] : 1]);
-        if (param === 33901) return new Float32Array([wp.aliasedPointSizeRange ? wp.aliasedPointSizeRange['0'] : 1, wp.aliasedPointSizeRange ? wp.aliasedPointSizeRange['1'] : 1024]);
-        if (param === 3386) return new Int32Array([wp.maxViewportDims ? wp.maxViewportDims['0'] : 16384, wp.maxViewportDims ? wp.maxViewportDims['1'] : 16384]);
-        if (webglMap[param] !== undefined) return webglMap[param];
+        if (param === 37445) {{
+          const v = origGetParameter.call(this, param);
+          if (typeof v === 'string' && /brave/i.test(v)) return 'Google Inc. (Intel)';
+          return v;
+        }}
+        if (param === 37446) {{
+          const r = origGetParameter.call(this, param);
+          if (typeof r === 'string' && (/brave/i.test(r) || /swiftshader/i.test(r) || /llvmpipe/i.test(r) || /virtualbox/i.test(r) || /vmware/i.test(r))) {{
+            return 'ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+          }}
+          return r;
+        }}
         return origGetParameter.apply(this, arguments);
       }}, 'getParameter', 1);
-      proto.getParameter = wrapped;
 
       if (proto.getExtension) {{
         const origGetExt = proto.getExtension;
@@ -660,22 +684,10 @@ class BrowserWorker:
           return ext;
         }}, 'getExtension', 1);
       }}
-
-      if (proto.getSupportedExtensions && wp.extensions) {{
-        const rawExt = isWebgl2 && wp.extensions2 ? wp.extensions2 : wp.extensions;
-        const extList = Array.isArray(rawExt) ? rawExt : String(rawExt).split(',');
-        const origGetExts = proto.getSupportedExtensions;
-        proto.getSupportedExtensions = wrapNative(function getSupportedExtensions() {{
-          if (!(this instanceof proto.constructor)) {{
-            return origGetExts.apply(this, arguments);
-          }}
-          return extList.slice();
-        }}, 'getSupportedExtensions', 0);
-      }}
     }}
 
-    if (typeof WebGLRenderingContext !== 'undefined') patchWebGL(WebGLRenderingContext.prototype, false);
-    if (typeof WebGL2RenderingContext !== 'undefined') patchWebGL(WebGL2RenderingContext.prototype, true);
+    if (typeof WebGLRenderingContext !== 'undefined') sanitizeWebGL(WebGLRenderingContext.prototype);
+    if (typeof WebGL2RenderingContext !== 'undefined') sanitizeWebGL(WebGL2RenderingContext.prototype);
 
     // 4. AudioContext properties
     const ap = {json.dumps(ap)};
@@ -946,23 +958,46 @@ class BrowserWorker:
                 except Exception as ex:
                     log_err(f"Locale override notice: {ex}")
 
-            # 3. User-Agent and Accept-Language HTTP headers
+            # 3. User-Agent, Accept-Language, and Sec-CH-UA Client Hints
+            ua = None
             if self.fp_spec:
                 ua = self.fp_spec.get("userAgent")
-                if ua:
-                    try:
-                        langs = self.fp_spec.get("languages") or ["en-US", "en"]
-                        accept_lang = ",".join(langs) if isinstance(langs, list) else str(langs)
-                        plat = self.fp_spec.get("platform") or "Win32"
-                        await tab.send(cdp.emulation.set_user_agent_override(
-                            user_agent=ua,
-                            accept_language=accept_lang,
-                            platform=plat,
-                        ))
-                    except Exception as ex:
-                        log_err(f"User agent override notice: {ex}")
+            if not ua and self.fpt_data:
+                ua = self.fpt_data.get("ua") or (self.fpt_data.get("attr") or {}).get("navigator.userAgent")
 
-            # 4. Geolocation override
+            if ua:
+                try:
+                    langs = (self.fp_spec.get("languages") if self.fp_spec else None) or ["en-US", "en"]
+                    accept_lang = ",".join(langs) if isinstance(langs, list) else str(langs)
+                    plat = (self.fp_spec.get("platform") if self.fp_spec else None) or "Win32"
+                    meta = self.get_user_agent_metadata()
+                    await tab.send(cdp.emulation.set_user_agent_override(
+                        user_agent=ua,
+                        accept_language=accept_lang,
+                        platform=plat,
+                        user_agent_metadata=meta,
+                    ))
+                except Exception as ex:
+                    log_err(f"User agent override notice: {ex}")
+
+            # 4. Device Metrics Override (screen dimensions, deviceScaleFactor, viewport)
+            raw_attr = (self.fpt_data or {}).get("attr") or {}
+            scr_w = int(raw_attr.get("screen.width") or (self.fp_spec.get("screen", {}).get("width") if self.fp_spec else 1920) or 1920)
+            scr_h = int(raw_attr.get("screen.height") or (self.fp_spec.get("screen", {}).get("height") if self.fp_spec else 1080) or 1080)
+            dpr = float(raw_attr.get("window.devicePixelRatio") or (self.fp_spec.get("viewport", {}).get("deviceScaleFactor") if self.fp_spec else 1.0) or 1.0)
+            try:
+                await tab.send(cdp.emulation.set_device_metrics_override(
+                    width=scr_w,
+                    height=scr_h,
+                    device_scale_factor=dpr,
+                    mobile=False,
+                    screen_width=scr_w,
+                    screen_height=scr_h,
+                ))
+            except Exception as ex:
+                log_err(f"Device metrics override notice: {ex}")
+
+            # 5. Geolocation override
             if self.fp_spec and self.fp_spec.get("geo"):
                 geo = self.fp_spec["geo"]
                 lat = geo.get("lat")
@@ -1130,6 +1165,20 @@ class BrowserWorker:
         config = zd.Config()
         config.user_data_dir = str(self.profile_dir)
         config.headless = self.headless
+        config.add_argument("--disable-blink-features=AutomationControlled")
+
+        # Prefer Google Chrome binary if installed
+        chrome_paths = [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
+        ]
+        for cp in chrome_paths:
+            if os.path.isfile(cp):
+                config.browser_executable_path = cp
+                log_err(f"Selected Chrome executable: {cp}")
+                break
 
         # WebRTC Policy configuration
         if self.webrtc_policy == "proxy_only":
@@ -1138,13 +1187,19 @@ class BrowserWorker:
             config.add_argument("--disable-webrtc")
             config.disable_webrtc = True
 
-        # Viewport configuration
+        # Viewport & User-Agent configuration
+        ua_str = None
         if self.fp_spec:
-            vp = self.fp_spec.get("viewport") or {}
-            if vp.get("width") and vp.get("height"):
-                config.add_argument(f"--window-size={int(vp['width'])},{int(vp['height'])}")
-            if self.fp_spec.get("userAgent"):
-                config.user_agent = self.fp_spec["userAgent"]
+            ua_str = self.fp_spec.get("userAgent")
+        if not ua_str and self.fpt_data:
+            ua_str = self.fpt_data.get("ua") or (self.fpt_data.get("attr") or {}).get("navigator.userAgent")
+        if ua_str:
+            config.user_agent = ua_str
+
+        raw_attr = (self.fpt_data or {}).get("attr") or {}
+        scr_w = int(raw_attr.get("screen.width") or (self.fp_spec.get("screen", {}).get("width") if self.fp_spec else 1920) or 1920)
+        scr_h = int(raw_attr.get("screen.height") or (self.fp_spec.get("screen", {}).get("height") if self.fp_spec else 1080) or 1080)
+        config.add_argument(f"--window-size={scr_w},{scr_h}")
 
         # Proxy configuration via LocalAuthProxy (handles HTTP and SOCKS5 authenticated proxies cleanly)
         self.local_proxy: Optional[LocalAuthProxy] = None
