@@ -78,10 +78,8 @@ def calculate_unpacked_ext_id(folder_path: str) -> str:
     return "".join(chr(ord("a") + (byte >> 4)) + chr(ord("a") + (byte & 0x0F)) for byte in h)
 
 
-def pin_extensions_to_toolbar(profile_dir: Path, ext_ids: List[str]):
-    """Pre-populate Chrome Default/Preferences with pinned_extensions so icons appear pinned on toolbar."""
-    if not ext_ids:
-        return
+def configure_profile_preferences(profile_dir: Path, webrtc_policy: str = "proxy_only", ext_ids: Optional[List[str]] = None):
+    """Pre-populate Chrome Default/Preferences with pinned_extensions and WebRTC IP handling policy."""
     pref_file = profile_dir / "Default" / "Preferences"
     pref_file.parent.mkdir(parents=True, exist_ok=True)
     prefs: Dict[str, Any] = {}
@@ -90,22 +88,30 @@ def pin_extensions_to_toolbar(profile_dir: Path, ext_ids: List[str]):
             prefs = json.loads(pref_file.read_text(encoding="utf-8"))
         except Exception:
             prefs = {}
-    ext_obj = prefs.setdefault("extensions", {})
-    current_pins = ext_obj.get("pinned_extensions", [])
-    if not isinstance(current_pins, list):
-        current_pins = []
 
-    new_pins = list(current_pins)
-    for eid in ext_ids:
-        if eid and eid not in new_pins:
-            new_pins.append(eid)
+    # 1. Pinned extensions
+    if ext_ids:
+        ext_obj = prefs.setdefault("extensions", {})
+        current_pins = ext_obj.get("pinned_extensions", [])
+        if not isinstance(current_pins, list):
+            current_pins = []
 
-    ext_obj["pinned_extensions"] = new_pins
+        new_pins = list(current_pins)
+        for eid in ext_ids:
+            if eid and eid not in new_pins:
+                new_pins.append(eid)
+
+        ext_obj["pinned_extensions"] = new_pins
+
+    # 2. WebRTC IP handling policy
+    if webrtc_policy in ("proxy_only", "disabled"):
+        prefs.setdefault("webrtc", {})["ip_handling_policy"] = "disable_non_proxied_udp"
+
     try:
         pref_file.write_text(json.dumps(prefs, indent=2), encoding="utf-8")
-        log_err(f"Pre-pinned {len(new_pins)} extension(s) to Chrome toolbar: {new_pins}")
+        log_err(f"Configured profile preferences (webrtc={webrtc_policy}, pinned_exts={len(ext_ids or [])})")
     except Exception as e:
-        log_err(f"Notice writing pinned_extensions to Preferences: {e}")
+        log_err(f"Notice writing Preferences: {e}")
 
 
 def prepare_extension_dir(ext_path: str, profile_dir: Path) -> Optional[str]:
@@ -275,7 +281,15 @@ class LocalAuthProxy:
                         h = await client_reader.readline()
                         if not h:
                             break
-                        if not h.lower().startswith(b"proxy-authorization:"):
+                        h_lower = h.lower()
+                        if h_lower.startswith(b"proxy-authorization:"):
+                            continue
+                        elif h_lower.startswith(b"proxy-connection:"):
+                            val = h.split(b":", 1)[1].strip()
+                            up_writer.write(b"Connection: " + val + b"\r\n")
+                        elif h_lower.startswith((b"via:", b"x-forwarded-for:", b"forwarded:", b"x-real-ip:")):
+                            continue
+                        else:
                             up_writer.write(h)
                         if h in (b"\r\n", b"\n"):
                             break
@@ -537,6 +551,7 @@ class BrowserWorker:
 
         langs = (self.fp_spec.get("languages") if self.fp_spec else None) or ["en-US", "en"]
         lang_primary = langs[0] if langs else "en-US"
+        proxy_ip = self.proxy_dict["host"] if self.proxy_dict else ""
 
         scr_w = int(attr.get("screen.width") or (self.fp_spec.get("screen", {}).get("width") if self.fp_spec else 1920) or 1920)
         scr_h = int(attr.get("screen.height") or (self.fp_spec.get("screen", {}).get("height") if self.fp_spec else 1080) or 1080)
@@ -819,6 +834,46 @@ class BrowserWorker:
       speechSynthesis.getVoices = wrapNative(function getVoices() {{
         return syntheticVoices.slice();
       }}, 'getVoices', 0);
+    }}
+ 
+    // 8. WebRTC Leak Protection & Candidate Sanitization
+    const proxyHost = {json.dumps(proxy_ip)};
+    if (typeof RTCPeerConnection !== 'undefined' && proxyHost) {{
+      const origCreateOffer = RTCPeerConnection.prototype.createOffer;
+      if (origCreateOffer) {{
+        RTCPeerConnection.prototype.createOffer = wrapNative(async function createOffer(options) {{
+          if (!(this instanceof RTCPeerConnection)) throw new TypeError('Illegal invocation');
+          const offer = await origCreateOffer.apply(this, arguments);
+          if (offer && offer.sdp) {{
+            offer.sdp = offer.sdp.replace(/c=IN IP4 [0-9.]+/g, 'c=IN IP4 ' + proxyHost);
+          }}
+          return offer;
+        }}, 'createOffer', 0);
+      }}
+
+      const origAddEventListener = RTCPeerConnection.prototype.addEventListener;
+      RTCPeerConnection.prototype.addEventListener = wrapNative(function addEventListener(type, listener, options) {{
+        if (type === 'icecandidate' && typeof listener === 'function') {{
+          const wrappedListener = function(event) {{
+            if (event && event.candidate) {{
+              const candStr = event.candidate.candidate || '';
+              if (/typ (srflx|host|prflx)/.test(candStr)) {{
+                const sanitized = candStr.replace(/(udp|tcp) \d+ ([0-9.]+)/g, (match, proto, ip) => {{
+                  if (ip === '127.0.0.1' || ip.startsWith('0.')) return match;
+                  return proto + ' 0 ' + proxyHost;
+                }});
+                try {{
+                  Object.defineProperty(event.candidate, 'candidate', {{ value: sanitized, configurable: true }});
+                  Object.defineProperty(event.candidate, 'address', {{ value: proxyHost, configurable: true }});
+                }} catch(e) {{}}
+              }}
+            }}
+            return listener.apply(this, arguments);
+          }};
+          return origAddEventListener.call(this, type, wrappedListener, options);
+        }}
+        return origAddEventListener.apply(this, arguments);
+      }}, 'addEventListener', 2);
     }}
 
   }} catch(e) {{}}
@@ -1182,7 +1237,8 @@ class BrowserWorker:
 
         # WebRTC Policy configuration
         if self.webrtc_policy == "proxy_only":
-            config.add_argument("--force-webrtc-ip-handling-policy=disable_non_proxied_udp")
+            config.add_argument("--force-webrtc-ip-handling-policy")
+            config.add_argument("--webrtc-ip-handling-policy=disable_non_proxied_udp")
         elif self.webrtc_policy == "disabled":
             config.add_argument("--disable-webrtc")
             config.disable_webrtc = True
@@ -1232,8 +1288,8 @@ class BrowserWorker:
                 except Exception as e:
                     log_err(f"Notice calculating ext id: {e}")
 
-        if ext_ids_to_pin:
-            pin_extensions_to_toolbar(self.profile_dir, ext_ids_to_pin)
+        # Pre-configure profile preferences (WebRTC policy and toolbar extensions)
+        configure_profile_preferences(self.profile_dir, self.webrtc_policy, ext_ids_to_pin)
 
         # Also supply --load-extension for compatible Chromium builds
         if prepared_extensions:
