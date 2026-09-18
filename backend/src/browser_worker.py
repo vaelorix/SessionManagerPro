@@ -169,7 +169,6 @@ class BrowserWorker:
         self.closed_by_user: bool = False
         self.input_queue: asyncio.Queue[str] = asyncio.Queue()
         self.running: bool = True
-        self.known_tabs: set = set()
 
     def generate_fingerprint_init_script(self) -> str:
         """Generate JavaScript to inject exact fingerprint specs into all frames before page load."""
@@ -376,88 +375,63 @@ class BrowserWorker:
             pass
         return out
 
-    def force_reveal_windows(self, force_bring_top: bool = True) -> List[int]:
-        """On Windows in headed mode, uncloak, restore, elevate Z-order and foreground Chromium windows."""
-        if self.headless or sys.platform != "win32":
-            return []
+    async def bring_browser_to_front(self):
+        """Bring the primary browser window to the foreground cleanly without opening extra windows."""
         try:
-            import ctypes
-            import ctypes.wintypes as w
-            u = ctypes.windll.user32
-            d = ctypes.windll.dwmapi
-            k32 = ctypes.windll.kernel32
+            if self.browser and self.browser.main_tab:
+                await self.browser.main_tab.bring_to_front()
+        except Exception:
+            pass
 
-            SW_RESTORE = 9
-            SW_SHOW = 5
-            DWMWA_CLOAK = 13
-            DWMWA_CLOAKED = 14
-            HWND_TOPMOST = -1
-            HWND_NOTOPMOST = -2
-            SWP_NOMOVE = 0x0002
-            SWP_NOSIZE = 0x0001
-            SWP_SHOWWINDOW = 0x0040
+        if not self.headless and sys.platform == "win32":
+            try:
+                import ctypes
+                import ctypes.wintypes as w
+                u = ctypes.windll.user32
+                k32 = ctypes.windll.kernel32
 
-            browser_pids = set()
-            for p in psutil.process_iter(['pid', 'name']):
-                try:
-                    pname = (p.info['name'] or '').lower()
-                    if 'chrome' in pname or 'msedge' in pname or 'brave' in pname:
-                        browser_pids.add(p.info['pid'])
-                except Exception:
-                    pass
+                browser_pids = set()
+                for p in psutil.process_iter(['pid', 'name']):
+                    try:
+                        pname = (p.info['name'] or '').lower()
+                        if 'chrome' in pname or 'msedge' in pname or 'brave' in pname:
+                            browser_pids.add(p.info['pid'])
+                    except Exception:
+                        pass
 
-            if not browser_pids:
-                return []
+                def enum_cb(hwnd, lParam):
+                    pid = w.DWORD()
+                    u.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                    if pid.value in browser_pids:
+                        # CRITICAL: ONLY foreground windows that are ALREADY visible and have an actual title.
+                        # NEVER call ShowWindow or restore on hidden GPU/renderer/utility windows.
+                        if u.IsWindowVisible(hwnd) and u.GetWindowTextLengthW(hwnd) > 0:
+                            cname = ctypes.create_unicode_buffer(256)
+                            u.GetClassNameW(hwnd, cname, 256)
+                            if "Chrome_WidgetWin" in cname.value:
+                                fore_hwnd = u.GetForegroundWindow()
+                                fore_thread = u.GetWindowThreadProcessId(fore_hwnd, None) if fore_hwnd else 0
+                                target_thread = u.GetWindowThreadProcessId(hwnd, None)
+                                cur_thread = k32.GetCurrentThreadId()
 
-            revealed = []
-            def enum_cb(hwnd, lParam):
-                pid = w.DWORD()
-                u.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-                if pid.value in browser_pids:
-                    cname = ctypes.create_unicode_buffer(256)
-                    u.GetClassNameW(hwnd, cname, 256)
-                    val = cname.value
-                    if "Chrome_WidgetWin" in val or "Chrome_RenderWidgetHostHWND" in val:
-                        # 1. Uncloak if cloaked
-                        cloaked = w.DWORD()
-                        hr = d.DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, ctypes.byref(cloaked), 4)
-                        if hr == 0 and cloaked.value != 0:
-                            uncloak_val = ctypes.c_int(0)
-                            d.DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, ctypes.byref(uncloak_val), 4)
+                                if cur_thread != target_thread:
+                                    u.AttachThreadInput(cur_thread, target_thread, True)
+                                if fore_thread and fore_thread != target_thread:
+                                    u.AttachThreadInput(fore_thread, target_thread, True)
 
-                        if force_bring_top:
-                            u.ShowWindow(hwnd, SW_RESTORE)
-                            u.ShowWindow(hwnd, SW_SHOW)
-                            u.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
-                            u.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+                                u.BringWindowToTop(hwnd)
+                                u.SetForegroundWindow(hwnd)
 
-                            fore_hwnd = u.GetForegroundWindow()
-                            fore_thread = u.GetWindowThreadProcessId(fore_hwnd, None) if fore_hwnd else 0
-                            target_thread = u.GetWindowThreadProcessId(hwnd, None)
-                            cur_thread = k32.GetCurrentThreadId()
+                                if fore_thread and fore_thread != target_thread:
+                                    u.AttachThreadInput(fore_thread, target_thread, False)
+                                if cur_thread != target_thread:
+                                    u.AttachThreadInput(cur_thread, target_thread, False)
+                    return True
 
-                            if cur_thread != target_thread:
-                                u.AttachThreadInput(cur_thread, target_thread, True)
-                            if fore_thread and fore_thread != target_thread:
-                                u.AttachThreadInput(fore_thread, target_thread, True)
-
-                            u.BringWindowToTop(hwnd)
-                            u.SetForegroundWindow(hwnd)
-
-                            if fore_thread and fore_thread != target_thread:
-                                u.AttachThreadInput(fore_thread, target_thread, False)
-                            if cur_thread != target_thread:
-                                u.AttachThreadInput(cur_thread, target_thread, False)
-
-                        revealed.append(hwnd)
-                return True
-
-            WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
-            u.EnumWindows(WNDENUMPROC(enum_cb), 0)
-            return revealed
-        except Exception as ex:
-            log_err(f"Notice during force_reveal_windows: {ex}")
-            return []
+                WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
+                u.EnumWindows(WNDENUMPROC(enum_cb), 0)
+            except Exception:
+                pass
 
     async def setup_tab(self, tab: zd.Tab, init_script: str):
         """Enable CDP Page and inject fingerprint init script."""
@@ -469,20 +443,15 @@ class BrowserWorker:
             log_err(f"Notice on setup_tab: {e}")
 
     async def periodic_tasks(self):
-        """Periodically sync cookies, tabs, and keep headed window visible."""
-        cycle = 0
+        """Periodically sync cookies and tabs."""
         while not self.closing and self.running:
             await asyncio.sleep(2.0)
-            cycle += 1
             if self.closing or not self.running or not self.browser:
                 break
             if getattr(self.browser, "stopped", False):
                 self.on_browser_close()
                 break
             try:
-                if not self.headless and sys.platform == "win32" and cycle <= 3:
-                    self.force_reveal_windows(force_bring_top=(cycle <= 2))
-
                 await self.dump_cookies()
                 tabs = self.collect_tabs()
                 emit("tabs", tabs=tabs)
@@ -531,10 +500,15 @@ class BrowserWorker:
                     target = url.strip() if url else "about:blank"
                     if target and not target.startswith(("http://", "https://", "about:")):
                         target = "https://" + target
-                    new_tab = await self.browser.get(target, new_tab=True)
-                    init_script = self.generate_fingerprint_init_script()
-                    if init_script and new_tab:
-                        await self.setup_tab(new_tab, init_script)
+                    try:
+                        tid = await self.browser.connection.send(cdp.target.create_target(target))
+                        init_script = self.generate_fingerprint_init_script()
+                        if init_script:
+                            nt = next((t for t in self.browser.tabs if getattr(t, "target_id", None) == tid), None)
+                            if nt:
+                                await self.setup_tab(nt, init_script)
+                    except Exception as e:
+                        log_err(f"new_page notice: {e}")
             elif action == "get_state":
                 tabs = self.collect_tabs()
                 cookie_count = await self.dump_cookies()
@@ -662,7 +636,7 @@ class BrowserWorker:
             if main_tab:
                 await self.setup_tab(main_tab, init_script)
 
-            # Navigate start URLs
+            # Navigate start URLs cleanly in the SAME window
             if self.start_urls:
                 first_url = self.start_urls[0]
                 if not first_url.startswith(("http://", "https://", "about:")):
@@ -682,13 +656,15 @@ class BrowserWorker:
                         next_url = "https://" + next_url
                     try:
                         log_err(f"Opening additional tab: {next_url}...")
-                        nt = await self.browser.get(next_url, new_tab=True)
-                        if init_script and nt:
-                            await self.setup_tab(nt, init_script)
+                        tid = await self.browser.connection.send(cdp.target.create_target(next_url))
+                        if init_script:
+                            nt = next((t for t in self.browser.tabs if getattr(t, "target_id", None) == tid), None)
+                            if nt:
+                                await self.setup_tab(nt, init_script)
                     except Exception as e:
                         log_err(f"Additional tab notice: {e}")
 
-            self.force_reveal_windows(force_bring_top=True)
+            await self.bring_browser_to_front()
             cookie_count = await self.dump_cookies()
 
             emit(
