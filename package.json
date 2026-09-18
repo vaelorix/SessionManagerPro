@@ -7,6 +7,9 @@
   "bin": {
     "session-manager": "backend/src/index.js"
   },
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
     "start": "node backend/src/server.js",
     "gui": "node backend/src/server.js",
