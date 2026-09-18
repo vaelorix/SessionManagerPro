@@ -1,6 +1,6 @@
 # 🏛️ System Architecture & Internal Engine Mechanics
 
-Technical specifications of the multi-tier SessionManagerPro orchestration engine, IPC pipeline, and stealth worker subsystem.
+Technical specifications of the multi-tier SessionManagerPro orchestration engine, IPC pipeline, and Zendriver driverless stealth subsystem.
 
 ---
 
@@ -26,10 +26,9 @@ graph TD
 
     subgraph Python Stealth Subsystem
         ORCH -->|Spawns Child Process via JSON-Lines Stdio| WRK[Stealth Worker<br/>browser_worker.py]
-        WRK --> INVPW[InvisiblePlaywright Stealth Engine]
-        WRK --> PIN[Toolbar Customizer<br/>browser.uiCustomization.state]
-        WRK --> MARIO[Marionette Automation Port]
-        INVPW --> FF[Firefox Stealth Instance<br/>Hardware-Mapped Canvas / WebGL / Audio]
+        WRK --> ZD[Zendriver CDP Engine]
+        WRK --> PROXY_EXT[Proxy Auth Injector<br/>webRequestAuthProvider]
+        ZD --> CHROME[Chromium Stealth Instance<br/>Hardware-Mapped Canvas / WebGL / Audio]
     end
 
     subgraph Persistent Storage Layer
@@ -62,20 +61,22 @@ graph TD
   - Employs an asynchronous queue stepper to enforce thread concurrency limits (e.g. max 5 concurrent browsers), preventing CPU spikes and memory exhaustion.
 - **Zero-Zombie Reaper (`reaper.js`)**:
   - Periodically scans the Windows process table using `psutil` heuristics.
-  - Automatically detects and terminates orphaned `geckodriver.exe` or `firefox.exe` processes whose parent Node.js worker has died, releasing locked ports and `.parent.lock` profile directories.
+  - Automatically detects and terminates orphaned `chrome.exe`, `msedge.exe`, or worker processes whose parent Node.js worker has died, releasing locked ports and `SingletonLock` profile directories.
 
 ---
 
 ### 3. Stealth Worker Subsystem (`backend/src/browser_worker.py`)
+- **Engine**: Powered by **Zendriver** (async Chrome DevTools Protocol engine forked from `nodriver`).
+- **Driverless Architecture**: Connects directly to the browser via CDP over WebSockets, strictly avoiding WebDriver binaries and preventing `navigator.webdriver` from ever being defined.
 - **IPC Protocol**: Communicates with the Node.js orchestrator via newline-delimited JSON messages over standard input (`stdin`) and standard output (`stdout`).
 - **Fingerprint Emulation**:
   - Injects authentic GPU renderer and vendor strings (`UNMASKED_RENDERER_WEBGL`).
   - Emulates physical hardware concurrency (`navigator.hardwareConcurrency`) and device memory (`navigator.deviceMemory`).
   - Spoofs genuine audio context frequencies and client hints without detectable synthetic entropy.
-- **Preference Optimization**:
-  - Dynamic proxy configuration with remote DNS lookups (`network.proxy.socks_remote_dns = true`).
-  - WebRTC proxy candidate enforcement (`media.peerconnection.ice.proxy_only = true`).
-  - Automated extension toolbar placement via `browser.uiCustomization.state`.
+- **Proxy & WebRTC Security**:
+  - Automatic Manifest V3 proxy authentication extension generation via `chrome.webRequest.onAuthRequired`.
+  - WebRTC proxy candidate enforcement (`--force-webrtc-ip-handling-policy=disable_non_proxied_udp`).
+  - Egress IP and timezone mapping via MaxMind GeoIP database.
 
 ---
 

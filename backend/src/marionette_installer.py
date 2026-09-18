@@ -1,5 +1,5 @@
 """
-Marionette Extension Installer for Firefox / InvisiblePlaywright.
+Legacy Extension Installer for SessionManagerPro.
 Installs webextensions (.xpi or unpacked folders) dynamically at runtime,
 bypassing release signature enforcement and deprecated sideloading restrictions.
 """

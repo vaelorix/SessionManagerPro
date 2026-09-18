@@ -9,6 +9,7 @@ Comprehensive setup, dependency verification, and troubleshooting instructions f
 | Component | Minimum Version | Recommended Version | Verification Command |
 | :--- | :--- | :--- | :--- |
 | **Operating System** | Windows 10 (Build 19041+) | Windows 11 (64-bit) | `winver` |
+| **Browser Runtime** | Google Chrome or Microsoft Edge | Latest Stable Chrome | Auto-discovered by Zendriver |
 | **Python** | `3.10` (64-bit) | `3.11.x` (64-bit) | `python --version` |
 | **Node.js** | `v18.0.0` | `v20.x LTS` or higher | `node --version` |
 | **npm** | `v9.0.0` | `v10.x` | `npm --version` |
@@ -28,7 +29,7 @@ cd "c:\path\to\launcher"
 
 ---
 
-### Step 2: Configure Python Virtual Environment
+### Step 2: Configure Python Virtual Environment & Zendriver
 SessionManagerPro isolates all stealth engine packages inside a local virtual environment (`.venv`) to avoid dependency collisions with system-level Python installations.
 
 ```powershell
@@ -41,24 +42,15 @@ python -m venv .venv
 # 3. Upgrade pip tooling
 pip install --upgrade pip setuptools wheel
 
-# 4. Install production dependencies
+# 4. Install production dependencies (includes zendriver)
 pip install -r requirements.txt
 ```
 
----
-
-### Step 3: Fetch the Stealth Browser Engine
-Download the official undetected Firefox browser binaries matching `invisible_playwright`:
-
-```powershell
-.\.venv\Scripts\python.exe -m invisible_playwright fetch
-```
-
-*Note: This command downloads the tailored browser binaries to your local AppData directory.*
+*Note: Zendriver connects directly to your installed Google Chrome or Microsoft Edge via Chrome DevTools Protocol. No external driver binaries (like chromedriver or geckodriver) are required.*
 
 ---
 
-### Step 4: Install Node.js Dependencies
+### Step 3: Install Node.js Dependencies
 Install root orchestrator dependencies and the React 19 dashboard dependencies:
 
 ```powershell
@@ -71,8 +63,8 @@ npm --prefix frontend install
 
 ---
 
-### Step 5: Run Automated Health Check
-Run the built-in diagnostic test to verify that all Python, Node.js, and browser dependencies are correctly linked:
+### Step 4: Run Automated Health Check
+Run the built-in diagnostic test to verify that Python, Node.js, and the Zendriver stealth engine are correctly linked:
 
 ```powershell
 npm run selfcheck
@@ -80,7 +72,7 @@ npm run selfcheck
 
 **Expected Successful Output:**
 ```text
-selfcheck ok — Python 3.11.x + invisible_playwright stealth engine verified
+selfcheck ok — Python 3.11.x + zendriver stealth engine verified
 ```
 
 ---
@@ -100,17 +92,12 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ---
 
-### 2. Python Architecture Mismatch (32-bit vs 64-bit)
-**Error:**
-```text
-ImportError: DLL load failed while importing _maxminddb: %1 is not a valid Win32 application.
-```
-**Solution:**
-Ensure you have installed a **64-bit** build of Python 3.10 or 3.11. Verify in PowerShell:
-```powershell
-python -c "import platform; print(platform.architecture())"
-# Output should be: ('64bit', 'WindowsPE')
-```
+### 2. Browser Executable Not Found
+If Zendriver fails to locate a Chromium browser:
+1. Ensure Google Chrome or Microsoft Edge is installed in default system directories:
+   - `C:\Program Files\Google\Chrome\Application\chrome.exe`
+   - `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`
+2. Alternatively, verify the browser executable path in your system PATH.
 
 ---
 

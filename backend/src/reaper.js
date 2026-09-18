@@ -6,13 +6,13 @@ const ROOT = path.resolve(__dirname, "..", "..");
 const PROFILES_DIR = path.join(ROOT, "data", "profiles");
 
 /**
- * Scan running processes on Windows/POSIX and identify launcher-associated Firefox or Python workers.
+ * Scan running processes on Windows/POSIX and identify launcher-associated Chromium, Edge, or Python workers.
  * @returns {Array<{pid: number, name: string, cmd: string}>}
  */
 function findLauncherProcesses() {
   if (process.platform === "win32") {
     try {
-      const psCmd = `powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"Name = 'firefox.exe' or Name = 'python.exe'\\" | Select-Object ProcessId, Name, CommandLine | ConvertTo-Json -Compress"`;
+      const psCmd = `powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"Name = 'chrome.exe' or Name = 'msedge.exe' or Name = 'firefox.exe' or Name = 'python.exe'\\" | Select-Object ProcessId, Name, CommandLine | ConvertTo-Json -Compress"`;
       const out = execSync(psCmd, { encoding: "utf8", timeout: 8000 }).trim();
       if (!out) return [];
 
@@ -32,11 +32,11 @@ function findLauncherProcesses() {
         const cmd = (p.CommandLine || "").toLowerCase().replace(/\\/g, "/");
         const name = (p.Name || "").toLowerCase();
 
-        // Check if Firefox process was spawned with juggler-pipe, our cache directory, or our data/profiles
-        const isOurFirefox =
-          name.includes("firefox") &&
-          (cmd.includes("-juggler-pipe") ||
-            cmd.includes("invisible-playwright") ||
+        // Check if browser process was spawned with launcher profiles, zendriver, or remote debugging
+        const isOurBrowser =
+          (name.includes("chrome") || name.includes("edge") || name.includes("firefox")) &&
+          (cmd.includes("remote-debugging-port") ||
+            cmd.includes("zendriver") ||
             cmd.includes(normalizedRoot + "/data/profiles"));
 
         // Check if Python worker is running browser_worker.py in this repo
@@ -45,7 +45,7 @@ function findLauncherProcesses() {
           cmd.includes("browser_worker.py") &&
           cmd.includes(normalizedRoot);
 
-        if (isOurFirefox || isOurWorker) {
+        if (isOurBrowser || isOurWorker) {
           results.push({
             pid: p.ProcessId,
             name: p.Name,
@@ -60,7 +60,7 @@ function findLauncherProcesses() {
   } else {
     // POSIX fallback
     try {
-      const out = execSync("pgrep -a -f 'firefox|browser_worker.py'", { encoding: "utf8", timeout: 5000 }).trim();
+      const out = execSync("pgrep -a -f 'chrome|msedge|firefox|browser_worker.py'", { encoding: "utf8", timeout: 5000 }).trim();
       if (!out) return [];
       const lines = out.split("\n");
       const results = [];
@@ -118,6 +118,9 @@ function cleanOrphanProcesses(activePids = new Set()) {
 
 const STALE_LOCK_FILES = [
   "parent.lock",
+  "SingletonLock",
+  "SingletonCookie",
+  "SingletonSocket",
   ".startup-incomplete",
   "MarionetteActivePort",
   "sessionstore.jsonlz4",

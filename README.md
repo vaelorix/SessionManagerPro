@@ -8,14 +8,14 @@
 
 ### *Enterprise Anti-Detect Stealth Browser Orchestrator* 🎭✨
 
-**Bypass modern anti-fraud algorithms, orchestrate multi-threaded stealth profiles, automatically pin toolbar extensions, and isolate proxy tunnels with authentic hardware signatures.**
+**Bypass modern anti-fraud algorithms, orchestrate multi-threaded driverless profiles, load custom extensions, and isolate proxy tunnels with authentic hardware signatures.**
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![C#](https://img.shields.io/badge/C%23-WPF%20%2F%20WebView2-239120?style=for-the-badge&logo=csharp&logoColor=white)](https://learn.microsoft.com/dotnet/csharp/)
-[![Engine](https://img.shields.io/badge/Engine-InvisiblePlaywright-FF4081?style=for-the-badge&logo=firefox&logoColor=white)](https://github.com/)
+[![Engine](https://img.shields.io/badge/Engine-Zendriver%20(CDP)-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](https://github.com/cdpdriver/zendriver)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-MIT-amber?style=for-the-badge)](LICENSE)
 
@@ -43,13 +43,14 @@
 
 ## 💎 Overview & Architecture
 
-Modern anti-fraud algorithms (such as Cloudflare Turnstile, Datadome, Akamai, and Kasada) detect automated browser instances by inspecting **entropy inconsistencies** — random WebGL parameters, synthetic audio noise, spoofed canvas signatures, and mismatched client hints.
+Modern anti-fraud algorithms (such as Cloudflare Turnstile, Datadome, Akamai, and Kasada) detect automated browser instances by inspecting **entropy inconsistencies** and traditional **WebDriver artifacts** (`navigator.webdriver`, chromedriver fingerprints, unnatural canvas noise).
 
 **SessionManagerPro** solves this at the architectural level:
+- **Driverless CDP Architecture**: Powered by **Zendriver** (async successor to `nodriver`), communicating directly with the browser via Chrome DevTools Protocol (CDP) over WebSockets with **zero WebDriver binaries or flags**.
 - **Deterministic Hardware Mapping**: Replaces synthetic randomness with captured hardware profiles from authentic physical machines.
-- **Hybrid Micro-Orchestrator**: Blends a ultra-lightweight **C# WPF + WebView2** native wrapper with a **Node.js Express / WebSocket** backend and an **isolated Python stealth worker** (`invisible_playwright`).
-- **Frame-1 Toolbar Pinning**: Dynamically modifies `browser.uiCustomization.state` before Firefox boots, ensuring all injected extensions are pinned to the primary navigation bar immediately.
-- **Zero-Zombie Reaper**: Continuous OS-level process management cleans orphaned `geckodriver` instances, leftover lockfiles (`.parent.lock`), and socket handles automatically.
+- **Hybrid Micro-Orchestrator**: Blends an ultra-lightweight **C# WPF + WebView2** native desktop host with a **Node.js Express / WebSocket** backend and an **isolated Python stealth worker**.
+- **Zero-Leak Proxy Tunnels**: Generates dynamic background proxy authentication extensions (`webRequestAuthProvider`) ensuring authenticated SOCKS5/HTTP proxies work with zero DNS or WebRTC leaks.
+- **Zero-Zombie Reaper**: Continuous OS-level process management cleans orphaned browser instances, leftover lockfiles (`SingletonLock`), and socket handles automatically.
 
 ---
 
@@ -57,12 +58,12 @@ Modern anti-fraud algorithms (such as Cloudflare Turnstile, Datadome, Akamai, an
 
 | Layer | Technology | Version | Purpose in SessionManagerPro |
 | :---: | :--- | :---: | :--- |
-| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg" width="22" height="22" /> | **Python** | `3.10+ / 3.11` | Subprocess browser worker, `invisible_playwright` engine, WebGL/Canvas spoofing & Marionette IPC |
+| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg" width="22" height="22" /> | **Python & Zendriver** | `3.10+ / 3.11` | Subprocess browser worker, `zendriver` CDP engine, WebGL/Canvas spoofing & driverless automation |
 | <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/nodejs/nodejs-original.svg" width="22" height="22" /> | **Node.js & Express** | `18+ LTS` | High-throughput backend REST API server, concurrency queue manager & real-time WebSocket telemetry hub |
 | <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" width="22" height="22" /> | **React** | `19.0` | Cyber-dark glassmorphism operator dashboard, reactive state management & modular component architecture |
 | <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/typescript/typescript-original.svg" width="22" height="22" /> | **TypeScript** | `5.0+` | Strict compile-time type safety across all frontend API contracts, WebSocket payloads, and UI states |
 | <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/csharp/csharp-original.svg" width="22" height="22" /> | **C# / .NET** | `4.8+` | Native Windows desktop wrapper executable hosting Microsoft Edge WebView2 Evergreen |
-| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/firefox/firefox-original.svg" width="22" height="22" /> | **Mozilla Firefox** | `Latest ESR` | Stealth browsing runtime isolated with sticky SOCKS5/HTTP proxies and authentic hardware fingerprints |
+| <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/chrome/chrome-original.svg" width="22" height="22" /> | **Chromium (Chrome / Edge)** | `Latest Stable` | Driverless runtime isolated with sticky SOCKS5/HTTP proxies and authentic hardware fingerprints |
 | <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/vitejs/vitejs-original.svg" width="22" height="22" /> | **Vite** | `6.0+` | Sub-second frontend Hot Module Replacement (HMR) and ultra-compact production bundling |
 
 ---
@@ -70,11 +71,12 @@ Modern anti-fraud algorithms (such as Cloudflare Turnstile, Datadome, Akamai, an
 ## 🌟 Enterprise Features
 
 - 🎭 **100% Authentic Physical Fingerprints**: Zero synthetic RNG noise. Viewports, GPU models (`UNMASKED_RENDERER_WEBGL`), audio contexts, CPU threads, and RAM are mapped from genuine captured systems.
-- 📌 **Automated Toolbar Pinning**: Unpack `.xpi`, `.crx`, or `.zip` extensions and watch them appear pinned directly to Firefox’s navigation bar on frame 1 via `browser.uiCustomization.state`.
-- 🛡️ **WebRTC Leak Armor**: Strict `media.peerconnection.ice.proxy_only` routing forces WebRTC packets through your proxy tunnel, or disables WebRTC completely with 0 packet leakage.
+- ⚡ **Driverless CDP Execution**: Direct WebSocket CDP connection completely eliminates `navigator.webdriver` artifacts and Selenium detection hooks.
+- 🛡️ **WebRTC Leak Armor**: Strict `--force-webrtc-ip-handling-policy=disable_non_proxied_udp` forces WebRTC packets through your proxy tunnel, or disables WebRTC completely with `--disable-webrtc`.
+- 🧩 **Seamless Extension Loading**: Supports unpacked `.crx`, `.zip`, and directory extensions loaded directly via Chromium's extension pipeline.
 - ⚡ **Dynamic Concurrency Stepper**: Control concurrent session load with a live stepper bar (from 1 to 20+ profiles simultaneously) without freezing host CPU or exhausting memory.
 - 👻 **Ephemeral & Cloaked Modes**: Run disposable sessions that wipe cookies and cache on exit, or cloak sessions completely in the background without rendering an interactive GUI.
-- 🧹 **Zero-Zombie Reaper Subsystem**: Auto-detects and terminates orphaned `geckodriver` processes, leftover `.parent.lock` files, and stale port bindings automatically.
+- 🧹 **Zero-Zombie Reaper Subsystem**: Auto-detects and terminates orphaned processes, leftover `SingletonLock` files, and stale port bindings automatically.
 
 ---
 
@@ -83,7 +85,7 @@ Modern anti-fraud algorithms (such as Cloudflare Turnstile, Datadome, Akamai, an
 ```text
 SessionManagerPro/
 ├── backend/                     # Node.js REST API server & WebSocket orchestrator
-│   └── src/                     # Express routes, session manager & browser_worker.py
+│   └── src/                     # Express routes, session manager & browser_worker.py (Zendriver)
 ├── data/                        # Persistent profiles, session configurations & cookies
 ├── docs/                        # Deep dive technical documentation guides
 │   ├── assets/                  # Local documentation assets and mascots
@@ -105,6 +107,7 @@ SessionManagerPro/
 
 ### 1. Prerequisites
 - **Operating System**: Windows 10 or Windows 11 (64-bit)
+- **Browser**: Google Chrome or Microsoft Edge installed
 - **Node.js**: `v18.0.0` or higher ([Download Node.js](https://nodejs.org/))
 - **Python**: `3.10` or `3.11` (64-bit) ([Download Python](https://www.python.org/))
 - **WebView2**: Built into Windows 10/11 ([Evergreen Runtime](https://developer.microsoft.com/microsoft-edge/webview2/))
@@ -117,14 +120,11 @@ python -m venv .venv
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# 2. Fetch stealth browser engine
-.\.venv\Scripts\python.exe -m invisible_playwright fetch
-
-# 3. Install Node.js dependencies
+# 2. Install Node.js dependencies
 npm install
 npm --prefix frontend install
 
-# 4. Verify system environment health
+# 3. Verify system environment health
 npm run selfcheck
 ```
 
@@ -175,7 +175,7 @@ Click any dropdown below to preview topic outlines:
 For comprehensive operating system requirements, virtual environment setup, and dependency troubleshooting, consult:  
 👉 [**Read docs/INSTALLATION.md ↗**](docs/INSTALLATION.md)
 
-- Prerequisites breakdown (Windows 10/11, Node 18+, Python 3.10+, WebView2)
+- Prerequisites breakdown (Windows 10/11, Node 18+, Python 3.10+, Chrome/Edge, WebView2)
 - Step-by-step PowerShell setup instructions
 - Automated health-check verification
 </details>
@@ -200,6 +200,7 @@ Detailed instructions on fine-tuning sessions, proxies, and extensions:
 👉 [**Read docs/CONFIGURATION.md ↗**](docs/CONFIGURATION.md)
 
 - Proxy authentication formats (HTTP, SOCKS4, SOCKS5)
+- Ephemeral proxy auth extensions for zero credential leaks
 - Authentic fingerprint library mapping vs synthetic RNG detection
 - Extensions Hub (uploading, Global Auto-Injection, profile bindings)
 - Launcher Options (WebRTC policies, multi-tab start URLs, ephemeral mode)
@@ -212,9 +213,9 @@ Detailed instructions on fine-tuning sessions, proxies, and extensions:
 Understand the inner workings and data flow of SessionManagerPro:  
 👉 [**Read docs/ARCHITECTURE.md ↗**](docs/ARCHITECTURE.md)
 
-- Architecture diagram (WPF WebView2 ➔ Node.js WebSocket ➔ Python Worker ➔ Firefox)
+- Architecture diagram (WPF WebView2 ➔ Node.js WebSocket ➔ Python Worker ➔ Zendriver CDP)
 - IPC communication over JSON-lines stdio
-- Dynamic Firefox preference injection (`browser.uiCustomization.state`)
+- Chrome DevTools Protocol automation without WebDriver binaries
 - Zombie process management and session locking
 </details>
 
@@ -236,9 +237,9 @@ Understand the inner workings and data flow of SessionManagerPro:
 
 ## 💖 Special Thanks & Credits
 
-SessionManagerPro is powered by the foundational open-source stealth automation engine:
+SessionManagerPro is powered by groundbreaking open-source driverless browser automation:
 
-- **[InvisiblePlaywright](https://github.com/)** (`invisible_playwright` & `invisible_core`) — The groundbreaking stealth engine providing authentic hardware fingerprint emulation, WebGL/Canvas spoofing, and undetectable Firefox browser automation.
+- **[Zendriver](https://github.com/cdpdriver/zendriver)** & **[Nodriver](https://github.com/ultrafunkamsterdam/nodriver)** (by [Ultrafunkamsterdam](https://github.com/ultrafunkamsterdam)) — The foundational async Chrome DevTools Protocol engine providing high-performance, driverless browser control without WebDriver artifacts.
 
 ---
 

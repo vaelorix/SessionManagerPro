@@ -108,7 +108,7 @@ function deriveSeed(id) {
 }
 
 /**
- * Convert existing fingerprint object / file attributes into invisible_playwright pin dict
+ * Convert existing fingerprint object / file attributes into zendriver pin dict
  */
 function buildPinConfig(record) {
   const fp = record.fingerprint;
@@ -125,7 +125,7 @@ function buildPinConfig(record) {
 }
 
 /**
- * Launch an invisible_playwright browser session
+ * Launch a zendriver browser session
  */
 function launchWorker(record, opts = {}) {
   return new Promise((resolve, reject) => {
@@ -352,7 +352,7 @@ function launchWorker(record, opts = {}) {
         try {
           proc.kill();
         } catch {}
-        reject(new Error("Timeout waiting for invisible_playwright worker to be ready"));
+        reject(new Error("Timeout waiting for zendriver worker to be ready"));
       }
     }, 120000);
     safetyTimer.unref?.();

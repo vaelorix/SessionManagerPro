@@ -68,10 +68,10 @@ function printHeader() {
   });
 
   console.log(
-    `   ${mint.bold("S E S S I O N   M A N A G E R   P R O")}  ${dim("•")}  ${cyan("I N V I S I B L E   P L A Y W R I G H T   E N G I N E")}`
+    `   ${mint.bold("S E S S I O N   M A N A G E R   P R O")}  ${dim("•")}  ${cyan("Z E N D R I V E R   C D P   E N G I N E")}`
   );
   console.log(
-    `   ${slate("Undetected Firefox Fingerprinting")}  ${dim("•")}  ${slate("C++ Source Stealth")}  ${dim("•")}  ${slate("Bezier Mouse Motion")}`
+    `   ${slate("Undetected Chromium Driverless")}  ${dim("•")}  ${slate("CDP Source Stealth")}  ${dim("•")}  ${slate("Bezier Mouse Motion")}`
   );
   console.log();
 
@@ -98,7 +98,7 @@ function printStatusBar() {
 
   console.log(`  ${dim("┌" + hLine + "┐")}`);
   console.log(
-    `  ${dim("│")}  ${cyan.bold("ENGINE:")} ${mint("InvisiblePlaywright (Firefox 151.0 • C++ Native)")}   ${dim("│")}  ${cyan.bold("THREADS:")} ${active > 0 ? emerald.bold(`${active}/${limit} LIVE`) : dim(`0/${limit} IDLE`)}  ${queued > 0 ? amber.bold(`(${queued} queued)`) : ""} ${dim("│")}`
+    `  ${dim("│")}  ${cyan.bold("ENGINE:")} ${mint("Zendriver (Chromium CDP • Driverless)")}          ${dim("│")}  ${cyan.bold("THREADS:")} ${active > 0 ? emerald.bold(`${active}/${limit} LIVE`) : dim(`0/${limit} IDLE`)}  ${queued > 0 ? amber.bold(`(${queued} queued)`) : ""} ${dim("│")}`
   );
   console.log(
     `  ${dim("│")}  ${cyan.bold("PROFILES:")} ${chalk.white.bold(total)} saved                  ${cyan.bold("PROXIES:")} ${chalk.white.bold(proxies)} total (${freeProxies} free)    ${dim("│")}  ${cyan.bold("STREAM:")} ${emerald.bold("● LIVE WS")}         ${dim("│")}`

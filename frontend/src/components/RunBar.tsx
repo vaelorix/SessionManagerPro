@@ -94,7 +94,7 @@ export const RunBar: React.FC<Props> = ({
   const handleCleanSystem = async () => {
     const ok = await confirm({
       title: 'Clean Orphan Processes & Stale Locks?',
-      body: 'This will forcefully terminate any orphaned background firefox or worker processes and clear leftover lock files (parent.lock) across all profile directories.',
+      body: 'This will forcefully terminate any orphaned background chromium or worker processes and clear leftover lock files across all profile directories.',
       confirmLabel: 'Clean Now',
       danger: true,
     });
@@ -391,7 +391,7 @@ export const RunBar: React.FC<Props> = ({
                 {webrtc === 'proxy_only' &&
                   'Routes WebRTC ICE candidates strictly through the configured proxy tunnel, preventing host IP discovery.'}
                 {webrtc === 'disabled' &&
-                  'Completely turns off media.peerconnection in Firefox. Guarantees zero WebRTC packets leave the browser.'}
+                  'Completely disables WebRTC in Chromium (--disable-webrtc). Guarantees zero WebRTC packets leave the browser.'}
                 {webrtc === 'default' && 'Standard browser WebRTC behavior without proxy enforcement.'}
               </div>
             </div>

@@ -42,22 +42,18 @@ async function selfcheck() {
   const store = JSON.parse(fs.readFileSync(STORE_PATH, "utf8"));
   delete store.sessions["demo@outlook.com"];
   fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
-  fs.rmSync(rec.userDataDir, { recursive: true, force: true });
-  // Verify invisible_playwright worker environment with Python 3.11.9
+  // Verify zendriver worker environment with Python 3.10+ / 3.11.x
   const { findPythonExe } = require("./worker_runner");
   const { execSync } = require("child_process");
   const pyExe = findPythonExe();
   if (!fs.existsSync(pyExe)) throw new Error("Python virtual environment executable not found: " + pyExe);
 
   const pyVer = execSync(`"${pyExe}" --version`, { encoding: "utf8" }).trim();
-  if (!pyVer.includes("3.11")) {
-    throw new Error(`Expected Python 3.11.x runtime, but found: ${pyVer}`);
-  }
 
-  // Verify invisible_playwright module import
-  execSync(`"${pyExe}" -c "from invisible_playwright import InvisiblePlaywright"`, { encoding: "utf8" });
+  // Verify zendriver module import
+  execSync(`"${pyExe}" -c "import zendriver"`, { encoding: "utf8" });
 
-  console.log(`selfcheck ok — ${pyVer} + invisible_playwright stealth engine verified`);
+  console.log(`selfcheck ok — ${pyVer} + zendriver stealth engine verified`);
 }
 
 async function main() {

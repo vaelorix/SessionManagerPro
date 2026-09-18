@@ -167,11 +167,11 @@ class Orchestrator extends EventEmitter {
       this.log(
         "info",
         "FINGERPRINT",
-        `Applied fingerprint: ${rec?.fingerprintFile || "Bayesian Profile"} (Firefox Stealth, seed: ${rec?.seed || "auto"}, ${vp.width || 1920}x${vp.height || 1080}, TZ: ${rec?.fingerprint?.timezone || "auto"})`,
+        `Applied fingerprint: ${rec?.fingerprintFile || "Bayesian Profile"} (Chromium Stealth, seed: ${rec?.seed || "auto"}, ${vp.width || 1920}x${vp.height || 1080}, TZ: ${rec?.fingerprint?.timezone || "auto"})`,
         name
       );
 
-      await this.markResult(name, "running", "launching invisible_playwright browser");
+      await this.markResult(name, "running", "launching zendriver browser");
       const launchOpts = this.sessionLaunchOpts.get(name) || {};
       this.sessionLaunchOpts.delete(name);
       const url = customUrl || launchOpts.url || this.defaultUrl || undefined;
@@ -188,7 +188,7 @@ class Orchestrator extends EventEmitter {
       this.log(
         "success",
         "BROWSER",
-        `InvisiblePlaywright Firefox window opened successfully (${this.live.size}/${this.threadLimit} live)`,
+        `Zendriver Chromium window opened successfully (${this.live.size}/${this.threadLimit} live)`,
         name
       );
       this.emit("pool:update", this.getStatus());

@@ -83,7 +83,7 @@ export const SettingsPanel: React.FC<Props> = ({
       const stats = await api.getStats();
       if (stats) {
         setCheckResult(`Ready — Engine verified (${stats.proxiesTotal} proxies, ${stats.fingerprintsTotal} prints)`);
-        onToast('success', 'InvisiblePlaywright stealth engine healthy');
+        onToast('success', 'Zendriver stealth engine healthy');
       }
     } catch (err: any) {
       setCheckResult(`Error: ${err.message}`);
@@ -145,7 +145,7 @@ export const SettingsPanel: React.FC<Props> = ({
           }}
         >
           <span className="dot" />
-          InvisiblePlaywright Active
+          Zendriver Active
         </span>
 
         <button
@@ -175,8 +175,8 @@ export const SettingsPanel: React.FC<Props> = ({
               <ShieldCheck size={20} strokeWidth={2.2} />
             </div>
             <div>
-              <h3>InvisiblePlaywright Stealth Engine</h3>
-              <p>Undetected Firefox 151.0 with native C++ source-level fingerprint spoofing & Bezier human curves</p>
+              <h3>Zendriver Stealth Engine (CDP Driverless)</h3>
+              <p>Driverless Chrome DevTools Protocol automation with hardware-consistent fingerprint emulation</p>
             </div>
             <button
               className="btn xs primary"
