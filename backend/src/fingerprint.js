@@ -21,12 +21,9 @@ function timezoneFromHost(host) {
 
 function listFptFiles() {
   if (!fs.existsSync(FPTS_DIR)) return [];
-  const all = fs
+  return fs
     .readdirSync(FPTS_DIR)
     .filter((f) => f.endsWith(".json.gz") || f.endsWith(".json"));
-  // Prioritize genuine Chrome fingerprints (_C.json.gz)
-  const chromeFiles = all.filter((f) => f.endsWith("_C.json.gz"));
-  return chromeFiles.length > 0 ? chromeFiles : all;
 }
 
 function loadFptRaw(file) {
@@ -49,18 +46,7 @@ function parseLang(lang) {
 function decodeUserAgentData(b64) {
   if (!b64) return null;
   try {
-    const data = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
-    if (data.brands && Array.isArray(data.brands)) {
-      data.brands = data.brands.map((b) =>
-        /brave/i.test(b.brand) ? { ...b, brand: "Google Chrome" } : b
-      );
-    }
-    if (data.fullVersionList && Array.isArray(data.fullVersionList)) {
-      data.fullVersionList = data.fullVersionList.map((b) =>
-        /brave/i.test(b.brand) ? { ...b, brand: "Google Chrome" } : b
-      );
-    }
-    return data;
+    return JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
   } catch {
     return null;
   }
@@ -91,16 +77,6 @@ async function buildFingerprint(file, proxy) {
   const width = Number(attr["screen.width"] || raw.width || 1920);
   const height = Number(attr["screen.height"] || raw.height || 1080);
   const dpr = Number(attr["window.devicePixelRatio"] || 1) || 1;
-
-  let webglVendor = raw.webgl_properties?.unmaskedVendor || "Google Inc. (Intel)";
-  let webglRenderer =
-    raw.webgl_properties?.unmaskedRenderer ||
-    "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)";
-  if (/brave/i.test(webglVendor) || /brave/i.test(webglRenderer)) {
-    webglVendor = "Google Inc. (Intel)";
-    webglRenderer = "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)";
-  }
-
   return {
     file,
     chromeVersion,
@@ -124,8 +100,10 @@ async function buildFingerprint(file, proxy) {
       pixelDepth: Number(attr["screen.pixelDepth"] || 24),
     },
     webgl: {
-      vendor: webglVendor,
-      renderer: webglRenderer,
+      vendor: raw.webgl_properties?.unmaskedVendor || "Google Inc. (Intel)",
+      renderer:
+        raw.webgl_properties?.unmaskedRenderer ||
+        "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)",
     },
     userAgentData: decodeUserAgentData(raw.useragentdata),
     geo: geo
@@ -260,118 +238,103 @@ function buildInitScript(fp) {
     const fp = ${jsonStr};
     if (!fp) return;
 
-    const nativeStrings = new WeakMap();
-    const origToString = Function.prototype.toString;
-
-    const pToString = new Proxy(origToString, {
-      apply(target, thisArg, args) {
-        if (typeof thisArg === 'function' && nativeStrings.has(thisArg)) {
-          return nativeStrings.get(thisArg);
-        }
-        return Reflect.apply(target, thisArg, args);
-      }
-    });
-    nativeStrings.set(pToString, 'function toString() { [native code] }');
-    nativeStrings.set(origToString, 'function toString() { [native code] }');
-    try {
-      Object.defineProperty(Function.prototype, 'toString', {
-        value: pToString,
-        writable: true,
+    // 1. Hardware Concurrency & Device Memory (Strictly from Fingerprint)
+    if (fp.hardwareConcurrency) {
+      Object.defineProperty(navigator, 'hardwareConcurrency', {
+        get: () => Number(fp.hardwareConcurrency),
         configurable: true,
-        enumerable: false
+        enumerable: true
       });
-    } catch (e) {}
-
-    function wrapNative(fn, name, length = 0) {
-      try {
-        Object.defineProperty(fn, 'name', { value: name, configurable: true });
-        Object.defineProperty(fn, 'length', { value: length, configurable: true });
-      } catch (e) {}
-      nativeStrings.set(fn, 'function ' + name + '() { [native code] }');
-      return fn;
     }
-
-    function overrideNavProp(prop, getValue) {
-      const getter = wrapNative(function () {
-        if (!(this instanceof Navigator) && this !== navigator) {
-          throw new TypeError('Illegal invocation');
-        }
-        return getValue();
-      }, 'get ' + prop, 0);
-
-      try {
-        Object.defineProperty(Navigator.prototype, prop, {
-          get: getter,
-          configurable: true,
-          enumerable: true
-        });
-      } catch (e) {}
+    if (fp.deviceMemory) {
+      Object.defineProperty(navigator, 'deviceMemory', {
+        get: () => Number(fp.deviceMemory),
+        configurable: true,
+        enumerable: true
+      });
     }
-
-    function overrideScreenProp(prop, getValue) {
-      const getter = wrapNative(function () {
-        if (!(this instanceof Screen) && this !== screen) {
-          throw new TypeError('Illegal invocation');
-        }
-        return getValue();
-      }, 'get ' + prop, 0);
-
-      try {
-        Object.defineProperty(Screen.prototype, prop, {
-          get: getter,
-          configurable: true,
-          enumerable: true
-        });
-      } catch (e) {}
+    if (fp.platform) {
+      Object.defineProperty(navigator, 'platform', {
+        get: () => fp.platform,
+        configurable: true,
+        enumerable: true
+      });
     }
-
-    // 1. Navigator properties (strictly on Navigator.prototype)
-    if (fp.hardwareConcurrency) overrideNavProp('hardwareConcurrency', () => Number(fp.hardwareConcurrency));
-    if (fp.deviceMemory) overrideNavProp('deviceMemory', () => Number(fp.deviceMemory));
-    if (fp.platform) overrideNavProp('platform', () => fp.platform);
-    if (fp.maxTouchPoints !== undefined) overrideNavProp('maxTouchPoints', () => Number(fp.maxTouchPoints));
-    if (fp.vendor) overrideNavProp('vendor', () => fp.vendor);
-    if (fp.userAgent) overrideNavProp('userAgent', () => fp.userAgent);
-    if (fp.appVersion) overrideNavProp('appVersion', () => fp.appVersion);
+    if (fp.maxTouchPoints !== undefined) {
+      Object.defineProperty(navigator, 'maxTouchPoints', {
+        get: () => Number(fp.maxTouchPoints),
+        configurable: true,
+        enumerable: true
+      });
+    }
+    if (fp.vendor) {
+      Object.defineProperty(navigator, 'vendor', {
+        get: () => fp.vendor,
+        configurable: true,
+        enumerable: true
+      });
+    }
+    if (fp.userAgent) {
+      Object.defineProperty(navigator, 'userAgent', {
+        get: () => fp.userAgent,
+        configurable: true,
+        enumerable: true
+      });
+    }
+    if (fp.appVersion) {
+      Object.defineProperty(navigator, 'appVersion', {
+        get: () => fp.appVersion,
+        configurable: true,
+        enumerable: true
+      });
+    }
     if (fp.languages && fp.languages.length) {
-      overrideNavProp('languages', () => Object.freeze([...fp.languages]));
-      overrideNavProp('language', () => fp.languages[0]);
+      Object.defineProperty(navigator, 'languages', {
+        get: () => Object.freeze([...fp.languages]),
+        configurable: true,
+        enumerable: true
+      });
+      Object.defineProperty(navigator, 'language', {
+        get: () => fp.languages[0],
+        configurable: true,
+        enumerable: true
+      });
     }
-    overrideNavProp('pdfViewerEnabled', () => true);
 
-    // 2. Screen properties (strictly on Screen.prototype)
+    // 2. Screen & Device Metrics (Strictly from Fingerprint)
     if (fp.screen) {
       const scr = fp.screen;
-      if (scr.width) overrideScreenProp('width', () => Number(scr.width));
-      if (scr.height) overrideScreenProp('height', () => Number(scr.height));
-      if (scr.availWidth) overrideScreenProp('availWidth', () => Number(scr.availWidth));
-      if (scr.availHeight) overrideScreenProp('availHeight', () => Number(scr.availHeight));
-      if (scr.colorDepth) overrideScreenProp('colorDepth', () => Number(scr.colorDepth));
-      if (scr.pixelDepth) overrideScreenProp('pixelDepth', () => Number(scr.pixelDepth));
-      overrideScreenProp('availLeft', () => 0);
-      overrideScreenProp('availTop', () => 0);
+      const metrics = {
+        width: scr.width,
+        height: scr.height,
+        availWidth: scr.availWidth || scr.width,
+        availHeight: scr.availHeight || scr.height,
+        colorDepth: scr.colorDepth || 24,
+        pixelDepth: scr.pixelDepth || scr.colorDepth || 24
+      };
+      for (const [k, v] of Object.entries(metrics)) {
+        if (v !== undefined) {
+          Object.defineProperty(screen, k, {
+            get: () => Number(v),
+            configurable: true,
+            enumerable: true
+          });
+        }
+      }
     }
     if (fp.viewport && fp.viewport.deviceScaleFactor) {
-      const dprGetter = wrapNative(function () {
-        return Number(fp.viewport.deviceScaleFactor);
-      }, 'get devicePixelRatio', 0);
-      try {
-        Object.defineProperty(window, 'devicePixelRatio', {
-          get: dprGetter,
-          configurable: true,
-          enumerable: true
-        });
-      } catch (e) {}
+      Object.defineProperty(window, 'devicePixelRatio', {
+        get: () => Number(fp.viewport.deviceScaleFactor),
+        configurable: true,
+        enumerable: true
+      });
     }
 
     // 3. WebGL GPU Unmasked Vendor & Renderer
     const patchWebGL = (proto) => {
       if (!proto || !proto.getParameter) return;
       const origGetParameter = proto.getParameter;
-      proto.getParameter = wrapNative(function getParameter(param) {
-        if (!(this instanceof proto.constructor)) {
-          return origGetParameter.apply(this, arguments);
-        }
+      proto.getParameter = function(param) {
         if (param === 37445) {
           return (fp.webgl && fp.webgl.vendor) || "Google Inc. (Intel)";
         }
@@ -379,68 +342,38 @@ function buildInitScript(fp) {
           return (fp.webgl && fp.webgl.renderer) || "ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)";
         }
         return origGetParameter.apply(this, arguments);
-      }, 'getParameter', 1);
+      };
     };
     if (typeof WebGLRenderingContext !== 'undefined') patchWebGL(WebGLRenderingContext.prototype);
     if (typeof WebGL2RenderingContext !== 'undefined') patchWebGL(WebGL2RenderingContext.prototype);
 
-    // 4. Client Hints (userAgentData on NavigatorUAData.prototype)
-    if (typeof NavigatorUAData !== 'undefined' && fp.userAgentData) {
+    // 4. Client Hints (navigator.userAgentData)
+    if (fp.userAgentData) {
       const uad = fp.userAgentData;
-      if (uad.brands) {
-        const bGetter = wrapNative(function () {
-          if (!(this instanceof NavigatorUAData)) throw new TypeError('Illegal invocation');
-          return Object.freeze([...uad.brands]);
-        }, 'get brands', 0);
-        try {
-          Object.defineProperty(NavigatorUAData.prototype, 'brands', {
-            get: bGetter,
-            configurable: true,
-            enumerable: true
-          });
-        } catch (e) {}
-      }
-      if (uad.mobile !== undefined) {
-        const mGetter = wrapNative(function () {
-          if (!(this instanceof NavigatorUAData)) throw new TypeError('Illegal invocation');
-          return Boolean(uad.mobile);
-        }, 'get mobile', 0);
-        try {
-          Object.defineProperty(NavigatorUAData.prototype, 'mobile', {
-            get: mGetter,
-            configurable: true,
-            enumerable: true
-          });
-        } catch (e) {}
-      }
-      if (uad.platform) {
-        const pGetter = wrapNative(function () {
-          if (!(this instanceof NavigatorUAData)) throw new TypeError('Illegal invocation');
-          return uad.platform;
-        }, 'get platform', 0);
-        try {
-          Object.defineProperty(NavigatorUAData.prototype, 'platform', {
-            get: pGetter,
-            configurable: true,
-            enumerable: true
-          });
-        } catch (e) {}
-      }
-
-      const origGHEV = NavigatorUAData.prototype.getHighEntropyValues;
-      NavigatorUAData.prototype.getHighEntropyValues = wrapNative(async function getHighEntropyValues(hints) {
-        if (!(this instanceof NavigatorUAData)) throw new TypeError('Illegal invocation');
-        const res = await origGHEV.apply(this, arguments);
-        if (uad.architecture) res.architecture = uad.architecture;
-        if (uad.bitness) res.bitness = uad.bitness;
-        if (uad.brands) res.brands = uad.brands;
-        if (uad.fullVersionList) res.fullVersionList = uad.fullVersionList;
-        if (uad.model !== undefined) res.model = uad.model;
-        if (uad.platform) res.platform = uad.platform;
-        if (uad.platformVersion) res.platformVersion = uad.platformVersion;
-        if (uad.wow64 !== undefined) res.wow64 = Boolean(uad.wow64);
-        return res;
-      }, 'getHighEntropyValues', 1);
+      Object.defineProperty(navigator, 'userAgentData', {
+        get: () => ({
+          brands: uad.brands || [
+            { brand: "Google Chrome", version: "131" },
+            { brand: "Chromium", version: "131" },
+            { brand: "Not_A Brand", version: "24" }
+          ],
+          mobile: Boolean(uad.mobile),
+          platform: uad.platform || (fp.platform === "Win32" ? "Windows" : fp.platform || "Windows"),
+          getHighEntropyValues: async (hints) => ({
+            architecture: uad.architecture || "x86",
+            bitness: uad.bitness || "64",
+            brands: uad.brands || [],
+            fullVersionList: uad.fullVersionList || [],
+            mobile: Boolean(uad.mobile),
+            model: uad.model || "",
+            platform: uad.platform || "Windows",
+            platformVersion: uad.platformVersion || "15.0.0",
+            wow64: Boolean(uad.wow64)
+          })
+        }),
+        configurable: true,
+        enumerable: true
+      });
     }
   } catch(e) {}
 })();

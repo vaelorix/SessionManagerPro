@@ -210,10 +210,6 @@ function launchWorker(record, opts = {}) {
       args.push("--fingerprint-spec", JSON.stringify(record.fingerprint));
     }
 
-    if (record.fingerprintFile) {
-      args.push("--fingerprint-file", record.fingerprintFile);
-    }
-
     if (record.fingerprint?.timezone) {
       args.push("--timezone", record.fingerprint.timezone);
     }
