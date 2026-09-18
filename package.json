@@ -17,6 +17,7 @@
     "cli": "node backend/src/index.js",
     "build:ui": "npm --prefix frontend run build",
     "build:exe": "powershell -ExecutionPolicy Bypass -File scripts/build-exe.ps1",
+    "build:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
     "build": "npm run build:ui && npm run build:exe",
     "engine:check": ".venv\\Scripts\\python.exe -c \"import zendriver; print('zendriver ready')\"",
     "selfcheck": "node backend/src/index.js selfcheck"

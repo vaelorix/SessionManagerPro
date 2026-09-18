@@ -79,6 +79,7 @@ function findPythonExe() {
 
   const localApp = process.env.LOCALAPPDATA || "";
   const candidates = [
+    path.join(ROOT, "runtime", "python", "python.exe"),
     path.join(ROOT, ".venv", "Scripts", "python.exe"),
     path.join(ROOT, ".venv", "bin", "python"),
     path.join(__dirname, "..", ".venv", "Scripts", "python.exe"),

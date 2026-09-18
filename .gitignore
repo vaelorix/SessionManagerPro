@@ -47,3 +47,8 @@ scratch/*
 !/resources/extensions/
 /resources/extensions/*
 !/resources/extensions/.gitkeep
+
+# installer build artifacts and portable toolchains
+/tools/
+/runtime/
+/dist-installer/

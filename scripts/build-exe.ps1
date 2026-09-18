@@ -28,8 +28,10 @@ if ($running) {
     }
 }
 
+$iconPath = Join-Path $rootDir "launcher\app.ico"
+$iconFlag = if (Test-Path $iconPath) { "/win32icon:$iconPath" } else { "" }
 Write-Host "Compiling native Windows launcher: $outputExe"
-& $csc /target:winexe /optimize+ /platform:anycpu /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.dll "/out:$outputExe" "$sourceFile"
+& $csc /target:winexe /optimize+ /platform:anycpu $iconFlag /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.dll "/out:$outputExe" "$sourceFile"
 
 if ($LASTEXITCODE -eq 0 -and (Test-Path $outputExe)) {
     $size = (Get-Item $outputExe).Length

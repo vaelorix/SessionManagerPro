@@ -90,7 +90,7 @@ namespace SessionManagerProLauncher
                         return;
                     }
 
-                    string nodeExe = FindNodeExecutable();
+                    string nodeExe = FindNodeExecutable(baseDir);
                     Log("Resolved Node.js path: " + nodeExe);
 
                     if (string.IsNullOrEmpty(nodeExe))
@@ -142,8 +142,8 @@ namespace SessionManagerProLauncher
                     Log("Server port status: " + (IsPortOpen("127.0.0.1", SERVER_PORT, 300) ? "ONLINE" : "TIMEOUT"));
                 }
 
-                // 2. Locate Microsoft Edge or Chromium browser
-                edgePath = FindEdgeExecutable();
+                // 2. Locate browser (configured browser, Microsoft Edge, or Chrome)
+                edgePath = FindBrowserExecutable(baseDir);
                 Log("Resolved browser path: " + (edgePath ?? "Default System Browser"));
 
                 // 3. Setup System Tray Application Context
@@ -325,8 +325,15 @@ namespace SessionManagerProLauncher
             }
         }
 
-        private static string FindNodeExecutable()
+        private static string FindNodeExecutable(string baseDir)
         {
+            // 1. Check bundled runtime directory
+            string localRuntime = Path.Combine(baseDir, "runtime", "node", "node.exe");
+            if (File.Exists(localRuntime)) return localRuntime;
+
+            string binRuntime = Path.Combine(baseDir, "bin", "node.exe");
+            if (File.Exists(binRuntime)) return binRuntime;
+
             string[] candidates = new string[]
             {
                 @"C:\Program Files\nodejs\node.exe",
@@ -362,15 +369,63 @@ namespace SessionManagerProLauncher
             return "node.exe";
         }
 
-        private static string FindEdgeExecutable()
+        private static string FindBrowserExecutable(string baseDir)
         {
+            // 1. Check browser_config.json written by installer or user
+            try
+            {
+                string cfgPath = Path.Combine(baseDir, "browser_config.json");
+                if (File.Exists(cfgPath))
+                {
+                    string content = File.ReadAllText(cfgPath);
+                    int idx = content.IndexOf("\"browserPath\"");
+                    if (idx >= 0)
+                    {
+                        int colon = content.IndexOf(':', idx);
+                        if (colon >= 0)
+                        {
+                            int q1 = content.IndexOf('"', colon);
+                            if (q1 >= 0)
+                            {
+                                int q2 = content.IndexOf('"', q1 + 1);
+                                if (q2 > q1)
+                                {
+                                    string p = content.Substring(q1 + 1, q2 - q1 - 1).Replace("\\\\", "\\");
+                                    if (File.Exists(p)) return p;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            // 2. Check HKCU\Software\SessionManagerPro\BrowserPath
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\SessionManagerPro"))
+                {
+                    if (key != null)
+                    {
+                        object val = key.GetValue("BrowserPath");
+                        if (val != null && File.Exists(val.ToString()))
+                        {
+                            return val.ToString();
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            // 3. Fallback to standard Edge and Chrome installations
             string[] paths = new string[]
             {
                 @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
                 @"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Microsoft\Edge\Application\msedge.exe"),
                 @"C:\Program Files\Google\Chrome\Application\chrome.exe",
-                @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+                @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Google\Chrome\Application\chrome.exe")
             };
 
             foreach (string p in paths)

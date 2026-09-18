@@ -509,8 +509,13 @@ app.post("/api/pool", (req, res) => {
   res.json(orchestrator.getStatus());
 });
 
-// Serve frontend static build if present (two levels up in frontend/dist)
-const FRONTEND_DIST = path.resolve(__dirname, "..", "..", "frontend", "dist");
+// Serve frontend static build if present
+const candidateDists = [
+  path.resolve(__dirname, "..", "..", "frontend", "dist"),
+  path.resolve(__dirname, "..", "..", "dist"),
+  path.resolve(__dirname, "..", "dist"),
+];
+const FRONTEND_DIST = candidateDists.find((p) => fs.existsSync(p)) || candidateDists[0];
 if (fs.existsSync(FRONTEND_DIST)) {
   app.use(express.static(FRONTEND_DIST));
   app.get("*", (req, res) => {

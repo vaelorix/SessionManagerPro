@@ -1222,18 +1222,47 @@ class BrowserWorker:
         config.headless = self.headless
         config.add_argument("--disable-blink-features=AutomationControlled")
 
-        # Prefer Google Chrome binary if installed
-        chrome_paths = [
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-            os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
-            os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
-        ]
-        for cp in chrome_paths:
-            if os.path.isfile(cp):
-                config.browser_executable_path = cp
-                log_err(f"Selected Chrome executable: {cp}")
-                break
+        # Check for user-configured browser executable (from installer or config)
+        custom_browser: Optional[str] = None
+        try:
+            cfg_file = ROOT / "browser_config.json"
+            if cfg_file.is_file():
+                cfg_data = json.loads(cfg_file.read_text(encoding="utf-8"))
+                candidate = cfg_data.get("browserPath")
+                if candidate and os.path.isfile(candidate):
+                    custom_browser = candidate
+        except Exception:
+            pass
+
+        if not custom_browser and sys.platform == "win32":
+            try:
+                import winreg
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\SessionManagerPro") as k:
+                    val, _ = winreg.QueryValueEx(k, "BrowserPath")
+                    if val and os.path.isfile(str(val)):
+                        custom_browser = str(val)
+            except Exception:
+                pass
+
+        if custom_browser:
+            config.browser_executable_path = custom_browser
+            log_err(f"Selected configured browser executable: {custom_browser}")
+        else:
+            # Prefer Google Chrome binary if installed, then Edge
+            chrome_paths = [
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
+                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+                os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe"),
+            ]
+            for cp in chrome_paths:
+                if os.path.isfile(cp):
+                    config.browser_executable_path = cp
+                    log_err(f"Selected detected browser executable: {cp}")
+                    break
 
         # WebRTC Policy configuration
         if self.webrtc_policy == "proxy_only":
