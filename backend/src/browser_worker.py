@@ -26,6 +26,7 @@ if sys.platform == "win32":
     sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8")
 
 LOCAL_DIR = str(Path(__file__).parent.resolve())
+ROOT = Path(__file__).resolve().parent.parent.parent
 if LOCAL_DIR not in sys.path:
     sys.path.insert(0, LOCAL_DIR)
 
@@ -331,12 +332,36 @@ class BrowserWorker:
         if not self.start_urls and getattr(args, "url", None):
             self.start_urls = [args.url]
 
+        self.fingerprint_file: Optional[str] = getattr(args, "fingerprint_file", None)
+        self.fpt_data: Dict[str, Any] = self.load_fingerprint_data()
+
         self.fp_spec: Optional[Dict[str, Any]] = None
         if getattr(args, "fingerprint_spec", None):
             try:
                 self.fp_spec = json.loads(args.fingerprint_spec) if isinstance(args.fingerprint_spec, str) else args.fingerprint_spec
             except Exception as e:
                 log_err(f"Failed to parse fingerprint_spec: {e}")
+
+        if not self.fp_spec and self.fpt_data:
+            attr = self.fpt_data.get("attr") or {}
+            self.fp_spec = {
+                "userAgent": self.fpt_data.get("ua") or attr.get("navigator.userAgent"),
+                "platform": attr.get("navigator.platform", "Win32"),
+                "hardwareConcurrency": attr.get("hardwareConcurrency", 8),
+                "deviceMemory": attr.get("deviceMemory", 8),
+                "viewport": {
+                    "width": attr.get("screen.width", 1920),
+                    "height": attr.get("screen.height", 1080),
+                }
+            }
+
+        # Sanitize any Brave WebGL strings from fp_spec if present
+        if self.fp_spec and self.fp_spec.get("webgl"):
+            w_ven = str(self.fp_spec["webgl"].get("vendor", ""))
+            w_ren = str(self.fp_spec["webgl"].get("renderer", ""))
+            if "brave" in w_ven.lower() or "brave" in w_ren.lower():
+                self.fp_spec["webgl"]["vendor"] = "Google Inc. (Intel)"
+                self.fp_spec["webgl"]["renderer"] = "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)"
 
         self.extensions: List[str] = []
         if getattr(args, "extensions", None):
@@ -374,153 +399,428 @@ class BrowserWorker:
         self.input_queue: asyncio.Queue[str] = asyncio.Queue()
         self.running: bool = True
 
+    def load_fingerprint_data(self) -> Dict[str, Any]:
+        """Load full raw fingerprint from resources/fpts/<fingerprint_file> with sanitization."""
+        fpt_data: Dict[str, Any] = {}
+        if self.fingerprint_file:
+            fpt_p = Path(self.fingerprint_file)
+            if not fpt_p.is_file():
+                fpt_p = ROOT / "resources" / "fpts" / self.fingerprint_file
+            if fpt_p.is_file():
+                try:
+                    raw_bytes = fpt_p.read_bytes()
+                    if fpt_p.suffix == ".gz":
+                        import gzip
+                        raw_bytes = gzip.decompress(raw_bytes)
+                    fpt_data = json.loads(raw_bytes.decode("utf-8"))
+                    log_err(f"Loaded full fingerprint file: {fpt_p.name} ({len(fpt_data)} keys)")
+                except Exception as ex:
+                    log_err(f"Failed to load raw fpt file {fpt_p}: {ex}")
+
+        # Sanitize Brave WebGL strings if present
+        wp = fpt_data.get("webgl_properties") or {}
+        unmasked_vendor = str(wp.get("unmaskedVendor", ""))
+        unmasked_renderer = str(wp.get("unmaskedRenderer", ""))
+        if "brave" in unmasked_vendor.lower() or "brave" in unmasked_renderer.lower():
+            wp["unmaskedVendor"] = "Google Inc. (Intel)"
+            wp["unmaskedRenderer"] = "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)"
+            fpt_data["webgl_properties"] = wp
+
+        # Sanitize Brave in useragentdata brands if present
+        uad_raw = fpt_data.get("useragentdata")
+        if uad_raw:
+            try:
+                uad = json.loads(base64.b64decode(uad_raw).decode("utf-8"))
+                changed = False
+                for brand_list_key in ("brands", "fullVersionList"):
+                    if brand_list_key in uad:
+                        new_list = []
+                        for b in uad[brand_list_key]:
+                            if "brave" in str(b.get("brand", "")).lower():
+                                b["brand"] = "Google Chrome"
+                                changed = True
+                            new_list.append(b)
+                        uad[brand_list_key] = new_list
+                if changed:
+                    fpt_data["useragentdata"] = base64.b64encode(json.dumps(uad).encode("utf-8")).decode("utf-8")
+            except Exception:
+                pass
+
+        return fpt_data
+
+    def get_user_agent_metadata(self) -> Optional[cdp.emulation.UserAgentMetadata]:
+        """Extract and construct CDP UserAgentMetadata from raw fingerprint or fp_spec."""
+        uad_obj: Dict[str, Any] = {}
+        uad_raw = (self.fpt_data or {}).get("useragentdata")
+        if uad_raw:
+            try:
+                uad_obj = json.loads(base64.b64decode(uad_raw).decode("utf-8"))
+            except Exception:
+                pass
+        if not uad_obj and self.fp_spec and self.fp_spec.get("userAgentData"):
+            uad_obj = self.fp_spec["userAgentData"]
+
+        if not uad_obj:
+            return None
+
+        brands_list = uad_obj.get("brands") or []
+        full_brands_list = uad_obj.get("fullVersionList") or []
+
+        brands_cdp = [
+            cdp.emulation.UserAgentBrandVersion(brand=str(b.get("brand", "")), version=str(b.get("version", "")))
+            for b in brands_list
+            if isinstance(b, dict) and b.get("brand")
+        ]
+        full_brands_cdp = [
+            cdp.emulation.UserAgentBrandVersion(brand=str(b.get("brand", "")), version=str(b.get("version", "")))
+            for b in full_brands_list
+            if isinstance(b, dict) and b.get("brand")
+        ]
+
+        full_version = str(uad_obj.get("fullVersion") or "")
+        platform = str(uad_obj.get("platform") or "Windows")
+        platform_version = str(uad_obj.get("platformVersion") or "10.0.0")
+        architecture = str(uad_obj.get("architecture") or "x86")
+        model = str(uad_obj.get("model") or "")
+        mobile = bool(uad_obj.get("mobile", False))
+        bitness = str(uad_obj.get("bitness") or "64")
+        wow64 = bool(uad_obj.get("wow64", False))
+
+        return cdp.emulation.UserAgentMetadata(
+            brands=brands_cdp,
+            full_version_list=full_brands_cdp,
+            full_version=full_version,
+            platform=platform,
+            platform_version=platform_version,
+            architecture=architecture,
+            model=model,
+            mobile=mobile,
+            bitness=bitness,
+            wow64=wow64,
+        )
+
     def generate_fingerprint_init_script(self) -> str:
         """Generate JavaScript to inject exact fingerprint specs into all frames before page load."""
-        if not self.fp_spec:
+        if not self.fp_spec and not self.fpt_data:
             return ""
-        fp_json = json.dumps(self.fp_spec)
+
+        raw_fpt = self.fpt_data or {}
+        attr = raw_fpt.get("attr") or {}
+        wp = raw_fpt.get("webgl_properties") or {}
+        if not wp and self.fp_spec and self.fp_spec.get("webgl"):
+            wp = {
+                "unmaskedVendor": self.fp_spec["webgl"].get("vendor", "Google Inc. (Intel)"),
+                "unmaskedRenderer": self.fp_spec["webgl"].get("renderer", "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)"),
+            }
+
+        ap = raw_fpt.get("audio_properties") or {}
+        conn = raw_fpt.get("connection") or {}
+        speech_voices = raw_fpt.get("speech") or []
+
+        uad_obj: Dict[str, Any] = {}
+        uad_raw = raw_fpt.get("useragentdata")
+        if uad_raw:
+            try:
+                uad_obj = json.loads(base64.b64decode(uad_raw).decode("utf-8"))
+            except Exception:
+                pass
+        if not uad_obj and self.fp_spec and self.fp_spec.get("userAgentData"):
+            uad_obj = self.fp_spec["userAgentData"]
+
+        hw_concurrency = int(attr.get("hardwareConcurrency") or (self.fp_spec.get("hardwareConcurrency") if self.fp_spec else 8) or 8)
+        device_memory = int(attr.get("deviceMemory") or (self.fp_spec.get("deviceMemory") if self.fp_spec else 8) or 8)
+        platform_str = str(attr.get("navigator.platform") or (self.fp_spec.get("platform") if self.fp_spec else "Win32") or "Win32")
+        max_touch = int(attr.get("maxTouchPoints") if attr.get("maxTouchPoints") is not None else ((self.fp_spec.get("maxTouchPoints") if self.fp_spec else 0) or 0))
+        vendor_str = str(attr.get("navigator.vendor") or (self.fp_spec.get("vendor") if self.fp_spec else "Google Inc.") or "Google Inc.")
+        ua_str = str(raw_fpt.get("ua") or attr.get("navigator.userAgent") or (self.fp_spec.get("userAgent") if self.fp_spec else "") or "")
+        app_ver = str(attr.get("navigator.appVersion") or (self.fp_spec.get("appVersion") if self.fp_spec else "") or "")
+
+        langs = (self.fp_spec.get("languages") if self.fp_spec else None) or ["en-US", "en"]
+        lang_primary = langs[0] if langs else "en-US"
+
+        scr_w = int(attr.get("screen.width") or (self.fp_spec.get("screen", {}).get("width") if self.fp_spec else 1920) or 1920)
+        scr_h = int(attr.get("screen.height") or (self.fp_spec.get("screen", {}).get("height") if self.fp_spec else 1080) or 1080)
+        avail_w = int(attr.get("screen.availWidth") or (self.fp_spec.get("screen", {}).get("availWidth") if self.fp_spec else scr_w) or scr_w)
+        avail_h = int(attr.get("screen.availHeight") or (self.fp_spec.get("screen", {}).get("availHeight") if self.fp_spec else scr_h - 40) or (scr_h - 40))
+        col_depth = int(attr.get("screen.colorDepth") or (self.fp_spec.get("screen", {}).get("colorDepth") if self.fp_spec else 24) or 24)
+        pix_depth = int(attr.get("screen.pixelDepth") or (self.fp_spec.get("screen", {}).get("pixelDepth") if self.fp_spec else col_depth) or col_depth)
+        dpr = float(attr.get("window.devicePixelRatio") or (self.fp_spec.get("viewport", {}).get("deviceScaleFactor") if self.fp_spec else 1.0) or 1.0)
+
         return f"""(function() {{
   try {{
-    const fp = {fp_json};
-    if (!fp) return;
+    const nativeStrings = new WeakMap();
+    const origToString = Function.prototype.toString;
 
-    // 1. Hardware Concurrency & Device Memory (Strictly from Fingerprint)
-    if (fp.hardwareConcurrency) {{
-      Object.defineProperty(navigator, 'hardwareConcurrency', {{
-        get: () => Number(fp.hardwareConcurrency),
+    const pToString = new Proxy(origToString, {{
+      apply(target, thisArg, args) {{
+        if (typeof thisArg === 'function' && nativeStrings.has(thisArg)) {{
+          return nativeStrings.get(thisArg);
+        }}
+        return Reflect.apply(target, thisArg, args);
+      }}
+    }});
+    nativeStrings.set(pToString, 'function toString() {{ [native code] }}');
+    nativeStrings.set(origToString, 'function toString() {{ [native code] }}');
+    try {{
+      Object.defineProperty(Function.prototype, 'toString', {{
+        value: pToString,
+        writable: true,
         configurable: true,
-        enumerable: true
+        enumerable: false
       }});
-    }}
-    if (fp.deviceMemory) {{
-      Object.defineProperty(navigator, 'deviceMemory', {{
-        get: () => Number(fp.deviceMemory),
-        configurable: true,
-        enumerable: true
-      }});
-    }}
-    if (fp.platform) {{
-      Object.defineProperty(navigator, 'platform', {{
-        get: () => fp.platform,
-        configurable: true,
-        enumerable: true
-      }});
-    }}
-    if (fp.maxTouchPoints !== undefined) {{
-      Object.defineProperty(navigator, 'maxTouchPoints', {{
-        get: () => Number(fp.maxTouchPoints),
-        configurable: true,
-        enumerable: true
-      }});
-    }}
-    if (fp.vendor) {{
-      Object.defineProperty(navigator, 'vendor', {{
-        get: () => fp.vendor,
-        configurable: true,
-        enumerable: true
-      }});
-    }}
-    if (fp.userAgent) {{
-      Object.defineProperty(navigator, 'userAgent', {{
-        get: () => fp.userAgent,
-        configurable: true,
-        enumerable: true
-      }});
-    }}
-    if (fp.appVersion) {{
-      Object.defineProperty(navigator, 'appVersion', {{
-        get: () => fp.appVersion,
-        configurable: true,
-        enumerable: true
-      }});
-    }}
-    if (fp.languages && fp.languages.length) {{
-      Object.defineProperty(navigator, 'languages', {{
-        get: () => Object.freeze([...fp.languages]),
-        configurable: true,
-        enumerable: true
-      }});
-      Object.defineProperty(navigator, 'language', {{
-        get: () => fp.languages[0],
-        configurable: true,
-        enumerable: true
-      }});
+    }} catch (e) {{}}
+
+    function wrapNative(fn, name, length = 0) {{
+      try {{
+        Object.defineProperty(fn, 'name', {{ value: name, configurable: true }});
+        Object.defineProperty(fn, 'length', {{ value: length, configurable: true }});
+      }} catch (e) {{}}
+      nativeStrings.set(fn, 'function ' + name + '() {{ [native code] }}');
+      return fn;
     }}
 
-    // 2. Screen & Device Metrics (Strictly from Fingerprint)
-    if (fp.screen) {{
-      const scr = fp.screen;
-      const metrics = {{
-        width: scr.width,
-        height: scr.height,
-        availWidth: scr.availWidth || scr.width,
-        availHeight: scr.availHeight || scr.height,
-        colorDepth: scr.colorDepth || 24,
-        pixelDepth: scr.pixelDepth || scr.colorDepth || 24
-      }};
-      for (const [k, v] of Object.entries(metrics)) {{
-        if (v !== undefined) {{
-          Object.defineProperty(screen, k, {{
-            get: () => Number(v),
+    function overrideNavProp(prop, getValue) {{
+      const getter = wrapNative(function () {{
+        if (!(this instanceof Navigator) && this !== navigator) {{
+          throw new TypeError('Illegal invocation');
+        }}
+        return getValue();
+      }}, 'get ' + prop, 0);
+
+      try {{
+        Object.defineProperty(Navigator.prototype, prop, {{
+          get: getter,
+          configurable: true,
+          enumerable: true
+        }});
+      }} catch (e) {{}}
+    }}
+
+    function overrideScreenProp(prop, getValue) {{
+      const getter = wrapNative(function () {{
+        if (!(this instanceof Screen) && this !== screen) {{
+          throw new TypeError('Illegal invocation');
+        }}
+        return getValue();
+      }}, 'get ' + prop, 0);
+
+      try {{
+        Object.defineProperty(Screen.prototype, prop, {{
+          get: getter,
+          configurable: true,
+          enumerable: true
+        }});
+      }} catch (e) {{}}
+    }}
+
+    // 1. Navigator properties (strictly on Navigator.prototype)
+    overrideNavProp('hardwareConcurrency', () => {hw_concurrency});
+    overrideNavProp('deviceMemory', () => {device_memory});
+    overrideNavProp('platform', () => {json.dumps(platform_str)});
+    overrideNavProp('maxTouchPoints', () => {max_touch});
+    overrideNavProp('vendor', () => {json.dumps(vendor_str)});
+    overrideNavProp('userAgent', () => {json.dumps(ua_str)});
+    overrideNavProp('appVersion', () => {json.dumps(app_ver)});
+    overrideNavProp('languages', () => Object.freeze({json.dumps(langs)}));
+    overrideNavProp('language', () => {json.dumps(lang_primary)});
+    overrideNavProp('pdfViewerEnabled', () => true);
+
+    // 2. Screen properties (strictly on Screen.prototype)
+    overrideScreenProp('width', () => {scr_w});
+    overrideScreenProp('height', () => {scr_h});
+    overrideScreenProp('availWidth', () => {avail_w});
+    overrideScreenProp('availHeight', () => {avail_h});
+    overrideScreenProp('colorDepth', () => {col_depth});
+    overrideScreenProp('pixelDepth', () => {pix_depth});
+    overrideScreenProp('availLeft', () => 0);
+    overrideScreenProp('availTop', () => 0);
+
+    if ({dpr} && {dpr} !== 1) {{
+      const dprGetter = wrapNative(function () {{
+        return Number({dpr});
+      }}, 'get devicePixelRatio', 0);
+      try {{
+        Object.defineProperty(window, 'devicePixelRatio', {{
+          get: dprGetter,
+          configurable: true,
+          enumerable: true
+        }});
+      }} catch (e) {{}}
+    }}
+
+    // 3. WebGL debug renderer info sanitization (Brave & virtualization leaks)
+    function sanitizeWebGL(proto) {{
+      if (!proto || !proto.getParameter) return;
+      const origGetParameter = proto.getParameter;
+      proto.getParameter = wrapNative(function getParameter(param) {{
+        if (!(this instanceof proto.constructor)) {{
+          return origGetParameter.apply(this, arguments);
+        }}
+        if (param === 37445) {{
+          const v = origGetParameter.call(this, param);
+          if (typeof v === 'string' && /brave/i.test(v)) return 'Google Inc. (Intel)';
+          return v;
+        }}
+        if (param === 37446) {{
+          const r = origGetParameter.call(this, param);
+          if (typeof r === 'string' && (/brave/i.test(r) || /swiftshader/i.test(r) || /llvmpipe/i.test(r) || /virtualbox/i.test(r) || /vmware/i.test(r))) {{
+            return 'ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+          }}
+          return r;
+        }}
+        return origGetParameter.apply(this, arguments);
+      }}, 'getParameter', 1);
+
+      if (proto.getExtension) {{
+        const origGetExt = proto.getExtension;
+        proto.getExtension = wrapNative(function getExtension(name) {{
+          const ext = origGetExt.apply(this, arguments);
+          if (ext && name === 'WEBGL_debug_renderer_info') {{
+            return {{
+              UNMASKED_VENDOR_WEBGL: 37445,
+              UNMASKED_RENDERER_WEBGL: 37446
+            }};
+          }}
+          return ext;
+        }}, 'getExtension', 1);
+      }}
+    }}
+
+    if (typeof WebGLRenderingContext !== 'undefined') sanitizeWebGL(WebGLRenderingContext.prototype);
+    if (typeof WebGL2RenderingContext !== 'undefined') sanitizeWebGL(WebGL2RenderingContext.prototype);
+
+    // 4. AudioContext properties
+    const ap = {json.dumps(ap)};
+    if (typeof BaseAudioContext !== 'undefined' && ap.BaseAudioContextSampleRate) {{
+      const srGetter = wrapNative(function () {{
+        if (!(this instanceof BaseAudioContext)) throw new TypeError('Illegal invocation');
+        return Number(ap.BaseAudioContextSampleRate);
+      }}, 'get sampleRate', 0);
+      try {{
+        Object.defineProperty(BaseAudioContext.prototype, 'sampleRate', {{
+          get: srGetter,
+          configurable: true,
+          enumerable: true
+        }});
+      }} catch (e) {{}}
+    }}
+    if (typeof AudioContext !== 'undefined') {{
+      if (ap.AudioContextBaseLatency !== undefined) {{
+        const blGetter = wrapNative(function () {{
+          if (!(this instanceof AudioContext)) throw new TypeError('Illegal invocation');
+          return Number(ap.AudioContextBaseLatency);
+        }}, 'get baseLatency', 0);
+        try {{
+          Object.defineProperty(AudioContext.prototype, 'baseLatency', {{
+            get: blGetter,
             configurable: true,
             enumerable: true
           }});
+        }} catch (e) {{}}
+      }}
+      if (ap.AudioContextOutputLatency !== undefined) {{
+        const olGetter = wrapNative(function () {{
+          if (!(this instanceof AudioContext)) throw new TypeError('Illegal invocation');
+          return Number(ap.AudioContextOutputLatency);
+        }}, 'get outputLatency', 0);
+        try {{
+          Object.defineProperty(AudioContext.prototype, 'outputLatency', {{
+            get: olGetter,
+            configurable: true,
+            enumerable: true
+          }});
+        }} catch (e) {{}}
+      }}
+    }}
+
+    // 5. Connection (NetworkInformation)
+    const conn = {json.dumps(conn)};
+    if (typeof NetworkInformation !== 'undefined' && conn) {{
+      for (const p of ['effectiveType', 'rtt', 'downlink', 'saveData']) {{
+        if (conn[p] !== undefined) {{
+          const g = wrapNative(function () {{
+            if (!(this instanceof NetworkInformation)) throw new TypeError('Illegal invocation');
+            return conn[p];
+          }}, 'get ' + p, 0);
+          try {{
+            Object.defineProperty(NetworkInformation.prototype, p, {{
+              get: g,
+              configurable: true,
+              enumerable: true
+            }});
+          }} catch (e) {{}}
         }}
       }}
     }}
-    if (fp.viewport && fp.viewport.deviceScaleFactor) {{
-      Object.defineProperty(window, 'devicePixelRatio', {{
-        get: () => Number(fp.viewport.deviceScaleFactor),
-        configurable: true,
-        enumerable: true
-      }});
+
+    // 6. Client Hints (userAgentData on NavigatorUAData.prototype)
+    const uad = {json.dumps(uad_obj)};
+    if (typeof NavigatorUAData !== 'undefined') {{
+      if (uad.brands) {{
+        const bGetter = wrapNative(function () {{
+          if (!(this instanceof NavigatorUAData)) throw new TypeError('Illegal invocation');
+          return Object.freeze([...uad.brands]);
+        }}, 'get brands', 0);
+        try {{
+          Object.defineProperty(NavigatorUAData.prototype, 'brands', {{
+            get: bGetter,
+            configurable: true,
+            enumerable: true
+          }});
+        }} catch (e) {{}}
+      }}
+      if (uad.mobile !== undefined) {{
+        const mGetter = wrapNative(function () {{
+          if (!(this instanceof NavigatorUAData)) throw new TypeError('Illegal invocation');
+          return Boolean(uad.mobile);
+        }}, 'get mobile', 0);
+        try {{
+          Object.defineProperty(NavigatorUAData.prototype, 'mobile', {{
+            get: mGetter,
+            configurable: true,
+            enumerable: true
+          }});
+        }} catch (e) {{}}
+      }}
+      if (uad.platform) {{
+        const pGetter = wrapNative(function () {{
+          if (!(this instanceof NavigatorUAData)) throw new TypeError('Illegal invocation');
+          return uad.platform;
+        }}, 'get platform', 0);
+        try {{
+          Object.defineProperty(NavigatorUAData.prototype, 'platform', {{
+            get: pGetter,
+            configurable: true,
+            enumerable: true
+          }});
+        }} catch (e) {{}}
+      }}
+
+      const origGHEV = NavigatorUAData.prototype.getHighEntropyValues;
+      NavigatorUAData.prototype.getHighEntropyValues = wrapNative(async function getHighEntropyValues(hints) {{
+        if (!(this instanceof NavigatorUAData)) throw new TypeError('Illegal invocation');
+        const res = await origGHEV.apply(this, arguments);
+        if (uad.architecture) res.architecture = uad.architecture;
+        if (uad.bitness) res.bitness = uad.bitness;
+        if (uad.brands) res.brands = uad.brands;
+        if (uad.fullVersionList) res.fullVersionList = uad.fullVersionList;
+        if (uad.model !== undefined) res.model = uad.model;
+        if (uad.platform) res.platform = uad.platform;
+        if (uad.platformVersion) res.platformVersion = uad.platformVersion;
+        if (uad.wow64 !== undefined) res.wow64 = Boolean(uad.wow64);
+        return res;
+      }}, 'getHighEntropyValues', 1);
     }}
 
-    // 3. WebGL GPU Unmasked Vendor & Renderer
-    const patchWebGL = (proto) => {{
-      if (!proto || !proto.getParameter) return;
-      const origGetParameter = proto.getParameter;
-      proto.getParameter = function(param) {{
-        if (param === 37445) {{
-          return (fp.webgl && fp.webgl.vendor) || "Google Inc. (Intel)";
-        }}
-        if (param === 37446) {{
-          return (fp.webgl && fp.webgl.renderer) || "ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)";
-        }}
-        return origGetParameter.apply(this, arguments);
-      }};
-    }};
-    if (typeof WebGLRenderingContext !== 'undefined') patchWebGL(WebGLRenderingContext.prototype);
-    if (typeof WebGL2RenderingContext !== 'undefined') patchWebGL(WebGL2RenderingContext.prototype);
-
-    // 4. Client Hints (navigator.userAgentData)
-    if (fp.userAgentData) {{
-      const uad = fp.userAgentData;
-      Object.defineProperty(navigator, 'userAgentData', {{
-        get: () => ({{
-          brands: uad.brands || [
-            {{ brand: "Google Chrome", version: "131" }},
-            {{ brand: "Chromium", version: "131" }},
-            {{ brand: "Not_A Brand", version: "24" }}
-          ],
-          mobile: Boolean(uad.mobile),
-          platform: uad.platform || (fp.platform === "Win32" ? "Windows" : fp.platform || "Windows"),
-          getHighEntropyValues: async (hints) => ({{
-            architecture: uad.architecture || "x86",
-            bitness: uad.bitness || "64",
-            brands: uad.brands || [],
-            fullVersionList: uad.fullVersionList || [],
-            mobile: Boolean(uad.mobile),
-            model: uad.model || "",
-            platform: uad.platform || "Windows",
-            platformVersion: uad.platformVersion || "15.0.0",
-            wow64: Boolean(uad.wow64)
-          }})
-        }}),
-        configurable: true,
-        enumerable: true
-      }});
+    // 7. Speech voices
+    const speechList = {json.dumps(speech_voices)};
+    if (typeof speechSynthesis !== 'undefined' && Array.isArray(speechList) && speechList.length > 0 && typeof SpeechSynthesisVoice !== 'undefined') {{
+      const syntheticVoices = speechList.map(v => Object.assign(Object.create(SpeechSynthesisVoice.prototype), v));
+      speechSynthesis.getVoices = wrapNative(function getVoices() {{
+        return syntheticVoices.slice();
+      }}, 'getVoices', 0);
     }}
+
   }} catch(e) {{}}
 }})();"""
 
@@ -658,23 +958,46 @@ class BrowserWorker:
                 except Exception as ex:
                     log_err(f"Locale override notice: {ex}")
 
-            # 3. User-Agent and Accept-Language HTTP headers
+            # 3. User-Agent, Accept-Language, and Sec-CH-UA Client Hints
+            ua = None
             if self.fp_spec:
                 ua = self.fp_spec.get("userAgent")
-                if ua:
-                    try:
-                        langs = self.fp_spec.get("languages") or ["en-US", "en"]
-                        accept_lang = ",".join(langs) if isinstance(langs, list) else str(langs)
-                        plat = self.fp_spec.get("platform") or "Win32"
-                        await tab.send(cdp.emulation.set_user_agent_override(
-                            user_agent=ua,
-                            accept_language=accept_lang,
-                            platform=plat,
-                        ))
-                    except Exception as ex:
-                        log_err(f"User agent override notice: {ex}")
+            if not ua and self.fpt_data:
+                ua = self.fpt_data.get("ua") or (self.fpt_data.get("attr") or {}).get("navigator.userAgent")
 
-            # 4. Geolocation override
+            if ua:
+                try:
+                    langs = (self.fp_spec.get("languages") if self.fp_spec else None) or ["en-US", "en"]
+                    accept_lang = ",".join(langs) if isinstance(langs, list) else str(langs)
+                    plat = (self.fp_spec.get("platform") if self.fp_spec else None) or "Win32"
+                    meta = self.get_user_agent_metadata()
+                    await tab.send(cdp.emulation.set_user_agent_override(
+                        user_agent=ua,
+                        accept_language=accept_lang,
+                        platform=plat,
+                        user_agent_metadata=meta,
+                    ))
+                except Exception as ex:
+                    log_err(f"User agent override notice: {ex}")
+
+            # 4. Device Metrics Override (screen dimensions, deviceScaleFactor, viewport)
+            raw_attr = (self.fpt_data or {}).get("attr") or {}
+            scr_w = int(raw_attr.get("screen.width") or (self.fp_spec.get("screen", {}).get("width") if self.fp_spec else 1920) or 1920)
+            scr_h = int(raw_attr.get("screen.height") or (self.fp_spec.get("screen", {}).get("height") if self.fp_spec else 1080) or 1080)
+            dpr = float(raw_attr.get("window.devicePixelRatio") or (self.fp_spec.get("viewport", {}).get("deviceScaleFactor") if self.fp_spec else 1.0) or 1.0)
+            try:
+                await tab.send(cdp.emulation.set_device_metrics_override(
+                    width=scr_w,
+                    height=scr_h,
+                    device_scale_factor=dpr,
+                    mobile=False,
+                    screen_width=scr_w,
+                    screen_height=scr_h,
+                ))
+            except Exception as ex:
+                log_err(f"Device metrics override notice: {ex}")
+
+            # 5. Geolocation override
             if self.fp_spec and self.fp_spec.get("geo"):
                 geo = self.fp_spec["geo"]
                 lat = geo.get("lat")
@@ -842,6 +1165,20 @@ class BrowserWorker:
         config = zd.Config()
         config.user_data_dir = str(self.profile_dir)
         config.headless = self.headless
+        config.add_argument("--disable-blink-features=AutomationControlled")
+
+        # Prefer Google Chrome binary if installed
+        chrome_paths = [
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
+        ]
+        for cp in chrome_paths:
+            if os.path.isfile(cp):
+                config.browser_executable_path = cp
+                log_err(f"Selected Chrome executable: {cp}")
+                break
 
         # WebRTC Policy configuration
         if self.webrtc_policy == "proxy_only":
@@ -850,13 +1187,19 @@ class BrowserWorker:
             config.add_argument("--disable-webrtc")
             config.disable_webrtc = True
 
-        # Viewport configuration
+        # Viewport & User-Agent configuration
+        ua_str = None
         if self.fp_spec:
-            vp = self.fp_spec.get("viewport") or {}
-            if vp.get("width") and vp.get("height"):
-                config.add_argument(f"--window-size={int(vp['width'])},{int(vp['height'])}")
-            if self.fp_spec.get("userAgent"):
-                config.user_agent = self.fp_spec["userAgent"]
+            ua_str = self.fp_spec.get("userAgent")
+        if not ua_str and self.fpt_data:
+            ua_str = self.fpt_data.get("ua") or (self.fpt_data.get("attr") or {}).get("navigator.userAgent")
+        if ua_str:
+            config.user_agent = ua_str
+
+        raw_attr = (self.fpt_data or {}).get("attr") or {}
+        scr_w = int(raw_attr.get("screen.width") or (self.fp_spec.get("screen", {}).get("width") if self.fp_spec else 1920) or 1920)
+        scr_h = int(raw_attr.get("screen.height") or (self.fp_spec.get("screen", {}).get("height") if self.fp_spec else 1080) or 1080)
+        config.add_argument(f"--window-size={scr_w},{scr_h}")
 
         # Proxy configuration via LocalAuthProxy (handles HTTP and SOCKS5 authenticated proxies cleanly)
         self.local_proxy: Optional[LocalAuthProxy] = None
@@ -1025,6 +1368,7 @@ def main():
     parser.add_argument("--webrtc-policy", default="proxy_only", help="WebRTC policy: proxy_only, disabled, or default")
     parser.add_argument("--ephemeral", action="store_true", help="Ephemeral mode: wipe profile on close")
     parser.add_argument("--fingerprint-spec", default=None, help="Exact fingerprint specification JSON string")
+    parser.add_argument("--fingerprint-file", default=None, help="Fingerprint filename in resources/fpts")
     parser.add_argument("--extra-prefs", default=None, help="Custom preferences JSON string")
 
     args = parser.parse_args()
